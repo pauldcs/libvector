@@ -25,4 +25,5 @@ CFLAGS_DBG := \
 -D DEBUG=1
 
 SRCS := \
-	vector.c
+	vector.c \
+	str.c

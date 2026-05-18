@@ -21,7 +21,7 @@ $(NAME): $(SRCS_OBJS)
 		$(NAME) \
 		$(SRCS_OBJS)
 
-g: CFLAGS += $(CFLAGS_DBG)
+g: CFLAGS = $(CFLAGS_DBG)
 g: all
 
 clean:
