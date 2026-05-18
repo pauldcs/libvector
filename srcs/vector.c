@@ -581,12 +581,12 @@ inline void vector_remove(vector *__this, size_t position) {
  * leaving the vector with a length of vector_length() - len.
  */
 inline void vector_remove_range(vector *__this, size_t start, size_t len) {
-  if (start >= vector_length(__this) || start + len >= vector_length(__this)) {
+  if (start > vector_length(__this) || len > vector_length(__this) - start) {
     return;
   }
 
   if (vector_has_destructor(__this)) {
-    vector_apply_destructor_in_range_unchecked(__this, 0, len);
+    vector_apply_destructor_in_range_unchecked(__this, start, start + len);
   }
 
   vector_leak_range_unchecked(__this, start, len);
@@ -624,7 +624,7 @@ inline void vector_leak_unchecked(vector *__this, size_t position) {
  * Note: the element destructor is not applied.
  */
 inline void vector_leak_range(vector *__this, size_t start, size_t len) {
-  if (start >= vector_length(__this) || start + len >= vector_length(__this)) {
+  if (start > vector_length(__this) || len > vector_length(__this) - start) {
     return;
   }
 
@@ -643,13 +643,17 @@ inline void vector_leak_range_unchecked(vector *__this, size_t start,
                   (vector_length(__this) - (start + len)) *
                       vector_elem_size(__this));
 
-  __vector_set_length_internal(__this, vector_length(__this) - 1);
+  __vector_set_length_internal(__this, vector_length(__this) - len);
 }
 
 /* The element at position `a` and the element at position `b`
  * are swapped.
  */
 inline void vector_swap_elems(vector *__this, size_t a, size_t b) {
+  if (a == b) {
+    return;
+  }
+
   size_t n = vector_elem_size(__this);
 
   char *p = vector_index_to_ptr_unchecked(__this, a);
@@ -700,14 +704,16 @@ inline void vector_from_raw_parts(vector *uninit_vec,
   uninit_vec->_destructor = destructor;
 }
 
-/* Returns the position of an element given a pointer to it.
- * Note: This is highly dangerous, as nothing checks that the
- * pointer is in fact pointing to an element in the internal buffer.
+/* Returns the position (element index) of an element given a pointer to it.
+ *
+ * Note: This is dangerous, as nothing checks that the pointer is
+ * in fact pointing to an element in the internal buffer.
  */
 inline __attribute__((always_inline)) size_t
 vector_elem_get_offset(const vector *__this, const void *element) {
-  return ((uintptr_t *)element -
-          (uintptr_t *)vector_first_to_ptr_unchecked(__this));
+  return (((const char *)element -
+           (const char *)vector_first_to_ptr_unchecked(__this)) /
+          vector_elem_size(__this));
 }
 
 /* Returns a ointer to the first uninitialized element in the buffer.
@@ -753,249 +759,4 @@ vector_uninitialized_size_of(const vector *__this) {
 inline __attribute__((always_inline)) void
 vector_append_from_capacity(vector *__this, size_t n) {
   __this->_len += n;
-}
-
-/* Creates a new dynamic string.
- * Note: when this function returns true, the internal buffer is
- * guaranteed to at least contain one null byte.
- */
-inline __attribute__((always_inline)) bool
-dstr_create(string *dstr_uninit, vector_allocator_t allocator, size_t len) {
-  if (unlikely(!vector_init(dstr_uninit, allocator, sizeof(char),
-                            len > 0 ? len : 1, NULL))) {
-    return (false);
-  }
-
-  vector_push_within_inner_unchecked(dstr_uninit, "");
-
-  return (true);
-}
-
-bool dstr_clone_slice(const string *__this, string *dstr_uninit, int64_t start,
-                      int64_t end) {
-  (void)__this;
-  (void)dstr_uninit;
-  (void)start;
-  (void)end;
-  return (false);
-}
-
-/* Creates a dynamic string from `cstr`. The string in copied using `strlcpy`.
- * If the string's length exceeds `mex_len`, false is returned and the
- * string should be considered uninitialized.
- */
-bool dstr_from_cstr(string *dstr_uninit, vector_allocator_t allocator,
-                    size_t max_len, const unsigned char *cstr) {
-  size_t len = strnlen((const char *)cstr, max_len);
-  if (unlikely(!vector_init(dstr_uninit, allocator, sizeof(char), len, NULL))) {
-    return (false);
-  }
-
-  if (unlikely(strlcpy(vector_first_to_ptr_unchecked(dstr_uninit),
-                       (const char *)cstr, len) != len)) {
-    vector_deinit(dstr_uninit);
-    return (false);
-  }
-
-  __vector_set_length_internal(dstr_uninit, len + 1);
-
-  return (true);
-}
-
-bool dstr_from_inner(string *dstr_uninit, unsigned char *cstr, size_t len) {
-  // UNIMPLEMENTED
-  (void)dstr_uninit;
-  (void)cstr;
-  (void)len;
-  return (false);
-}
-
-bool dstr_from_format(string *dstr_uninit, vector_allocator_t allocator,
-                      size_t max_len, const char *format, ...) {
-  // UNIMPLEMENTED
-  (void)dstr_uninit;
-  (void)allocator;
-  (void)max_len;
-  (void)format;
-  return (false);
-}
-
-inline __attribute__((always_inline)) unsigned char *
-dstr_leak_cstr(const string *__this) {
-  return ((unsigned char *)vector_first_to_ptr(__this));
-}
-
-/* Creates a new dynamic string by using the provided `cstr`
- * as it's internal buffer.
- * Note: this is very dangerous. Nothing is checked.
- * Note: the string must have been allocated by `allocator`.
- */
-void dstr_from_cstr_unchecked(string *dstr_uninit, vector_allocator_t allocator,
-                              const unsigned char *cstr, size_t capacity,
-                              size_t len) {
-  __memset(dstr_uninit, 0, sizeof(string));
-
-  __vector_set_capacity_internal(dstr_uninit, capacity);
-  __vector_set_elem_size_internal(dstr_uninit, sizeof(char));
-  __vector_set_length_internal(dstr_uninit, len);
-  __vector_set_ptr_internal(dstr_uninit, (void *)cstr);
-
-  dstr_uninit->_allocator = allocator;
-}
-
-/* Returns the length of the string.
- * This return the lenght of the currently used capacity - 1.
- * This essencially is the dynamic strings `strlen`.
- */
-inline __attribute__((always_inline)) size_t dstr_length(const string *__this) {
-  return (vector_length(__this) - 1);
-}
-
-/* Truncated the string to length 0.
- * Note: the string will have a null bytes as it's first character.
- */
-inline __attribute__((always_inline)) void dstr_clear(string *__this) {
-  char *ptr = vector_first_to_ptr_unchecked(__this);
-
-  *ptr = '\0';
-
-  __vector_set_length_internal(__this, 1);
-}
-
-/* Deallocates the strings internal buffer.
- */
-inline __attribute__((always_inline)) void dstr_kill(string *__this) {
-  __this->_allocator.release(vector_first_to_ptr_unchecked(__this));
-}
-
-/* Pushes a character to the position before the trailing null byte.
- */
-inline __attribute__((always_inline)) bool dstr_push_char(string *__this,
-                                                          unsigned char c) {
-  if (unlikely(!vector_adjust_cap_if_full(__this, 1))) {
-    return (false);
-  }
-
-  vector_insert_within_inner_unchecked(__this, vector_length(__this) - 1, &c);
-  return (true);
-}
-
-/* Removes the character before the trailing null byte.
- */
-inline __attribute__((always_inline)) void dstr_pop_char(string *__this) {
-  if (likely(dstr_length(__this) != 0)) {
-    vector_remove(__this, dstr_length(__this) - 1);
-  }
-}
-
-/* Inserts the character pointed to by `c` before `position`.
- */
-inline __attribute__((always_inline)) bool
-dstr_insert_char(string *__this, size_t position, unsigned char c) {
-  if (unlikely(position > dstr_length(__this)) ||
-      unlikely(!vector_adjust_cap_if_full(__this, 1))) {
-    return (false);
-  }
-
-  vector_insert_within_inner_unchecked(__this, position, &c);
-
-  return (true);
-}
-
-/* Inserts the null terminated string pointed to by `cstr` before `position`.
- */
-bool dstr_insert_cstr(string *__this, size_t position, size_t max_len,
-                      const unsigned char *cstr) {
-  // UNIMPLEMENTED
-  (void)__this;
-  (void)position;
-  (void)max_len;
-  (void)cstr;
-  return (false);
-}
-
-bool dstr_insert_format(string *__this, size_t position, size_t max_len,
-                        const char *format, ...) {
-  // UNIMPLEMENTED
-  (void)__this;
-  (void)position;
-  (void)max_len;
-  (void)format;
-  return (false);
-}
-
-inline __attribute__((always_inline)) bool
-dstr_insert_other(string *__this, size_t position, const string *other) {
-  return (vector_copy_contiguous(__this, position, vector_first_to_ptr(other),
-                                 vector_length(other)));
-}
-
-bool dstr_push_cstr(string *__this, size_t max_len, const unsigned char *cstr) {
-  // UNIMPLEMENTED
-  (void)__this;
-  (void)max_len;
-  (void)cstr;
-  return (false);
-}
-
-bool dstr_push_format(string *__this, size_t position, size_t max_len,
-                      const char *format, ...) {
-  // UNIMPLEMENTED
-  (void)__this;
-  (void)position;
-  (void)max_len;
-  (void)format;
-  return (false);
-}
-
-bool dstr_push_other(string *__this, size_t position, const string *other) {
-  // UNIMPLEMENTED
-  (void)__this;
-  (void)position;
-  (void)other;
-  return (false);
-}
-
-inline __attribute__((always_inline)) unsigned char *
-dstr_index_to_ptr(const string *__this, ssize_t position) {
-  return (vector_index_to_ptr(__this, position));
-}
-
-inline __attribute__((always_inline)) bool dstr_pushf_char(string *__this,
-                                                           unsigned char c) {
-  return (vector_pushf(__this, &c));
-}
-
-inline __attribute__((always_inline)) void dstr_popf_char(string *__this) {
-  vector_popf(__this);
-}
-
-inline __attribute__((always_inline)) void dstr_remove(string *__this,
-                                                       size_t position) {
-  vector_remove(__this, position);
-}
-
-inline __attribute__((always_inline)) void
-dstr_remove_range(string *__this, size_t start, size_t end) {
-  vector_remove_range(__this, start, end);
-}
-
-inline __attribute__((always_inline)) void dstr_truncate(string *__this,
-                                                         size_t len) {
-  // UNIMPLEMENTED
-  (void)__this;
-  (void)len;
-  return;
-}
-
-inline __attribute__((always_inline)) bool dstr_shrink(string *__this,
-                                                       size_t len) {
-  // UNIMPLEMENTED
-  (void)__this;
-  (void)len;
-  return (false);
-}
-
-inline __attribute__((always_inline)) bool dstr_shrink_to_fit(string *__this) {
-  return (vector_shrink_to_fit(__this));
 }

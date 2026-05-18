@@ -44,7 +44,6 @@ typedef struct {
 } vector_allocator_t;
 
 typedef struct vector vector;
-typedef struct vector string;
 
 struct vector {
   void *_ptr;        /* A pointer to the start of the buffer */
@@ -54,6 +53,10 @@ struct vector {
   void (*_destructor)(void *);   /* the element destructor function */
   vector_allocator_t _allocator; /* the memory allocator */
 };
+
+void __vector_set_length_internal(vector *__this, size_t len);
+void __vector_set_ptr_internal(vector *__this, void *ptr);
+void __vector_set_capacity_internal(vector *__this, size_t cap);
 
 bool vector_init(vector *uninit_vec, vector_allocator_t allocator,
                  size_t elem_size, size_t init_cap, void (*destructor)(void *));
@@ -110,42 +113,5 @@ void *vector_index_to_ptr_unchecked(const vector *this, size_t position);
 void *vector_first_to_ptr_unchecked(const vector *this);
 void *vector_last_to_ptr_unchecked(const vector *this);
 void vector_append_from_capacity(vector *this, size_t n);
-
-/* String */
-bool dstr_create(string *dstr_uninit, vector_allocator_t allocator, size_t len);
-bool dstr_clone(const string *this, string *dstr_uninit);
-bool dstr_clone_slice(const string *this, string *dstr_uninit, int64_t start,
-                      int64_t end);
-bool dstr_from_cstr(string *dstr_uninit, vector_allocator_t allocator,
-                    size_t max_len, const unsigned char *cstr);
-void dstr_from_cstr_unchecked(string *dstr_uninit, vector_allocator_t allocator,
-                              const unsigned char *cstr, size_t capacity,
-                              size_t len);
-bool dstr_from_format(string *dstr_uninit, vector_allocator_t allocator,
-                      size_t max_len, const char *format, ...);
-size_t dstr_length(const string *this);
-bool dstr_is_empty(const string *this);
-void dstr_clear(string *this);
-void dstr_kill(string *this);
-bool dstr_pushf_char(string *this, unsigned char c);
-void dstr_popf_char(string *this);
-bool dstr_push_char(string *this, unsigned char c);
-bool dstr_push_cstr(string *this, size_t max_len, const unsigned char *cstr);
-bool dstr_push_other(string *this, size_t position, const string *other);
-bool dstr_push_format(string *this, size_t position, size_t max_len,
-                      const char *format, ...);
-void dstr_pop_char(string *this);
-bool dstr_insert_char(string *this, size_t position, unsigned char c);
-bool dstr_insert_cstr(string *this, size_t position, size_t max_len,
-                      const unsigned char *cstr);
-bool dstr_insert_format(string *this, size_t position, size_t max_len,
-                        const char *format, ...);
-bool dstr_insert_other(string *this, size_t position, const string *other);
-unsigned char *dstr_index_to_ptr(const string *this, ssize_t position);
-void dstr_remove(string *this, size_t position);
-void dstr_remove_range(string *this, size_t start, size_t end);
-void dstr_truncate(string *this, size_t len);
-bool dstr_shrink_to_fit(string *this);
-unsigned char *dstr_leak_cstr(const string *this);
 
 #endif /* __VECTOR_H__ */
