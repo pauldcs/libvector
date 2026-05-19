@@ -1,10 +1,44 @@
 #ifndef __VECTOR_H__
 #define __VECTOR_H__
 
+#include <signal.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+
+#if defined(__cplusplus) && (__cplusplus >= 201703L)
+// C++17 or later use [[nodiscard]]
+#define __no_discard [[nodiscard]]
+#elif defined(__GNUC__) || defined(__clang__)
+#define __no_discard __attribute__((warn_unused_result))
+#elif defined(_MSC_VER)
+#define __no_discard _Check_return_
+#else
+#define __no_discard
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#define __pure1 __attribute__((pure))
+#elif defined(_MSC_VER)
+#define __pure1
+#else
+#define __pure1
+#endif
+
+#ifndef DEBUG
+#define __bug_if_fail__(expr)
+#else
+#define __bug_if_fail__(expr)                                                  \
+  do {                                                                         \
+    if (!(expr)) {                                                             \
+      fprintf(stderr, "buggy condition in %s line %d, expected (%s)\n",        \
+              __FILE__, __LINE__, #expr);                                      \
+      raise(SIGSEGV);                                                          \
+    };                                                                         \
+  } while (0)
+#endif
 
 #define MIN_CAP 24
 
@@ -54,9 +88,9 @@ struct vector {
   vector_allocator_t _allocator; /* the memory allocator */
 };
 
-void __vector_set_length_internal(vector *__this, size_t len);
-void __vector_set_ptr_internal(vector *__this, void *ptr);
-void __vector_set_capacity_internal(vector *__this, size_t cap);
+void __vector_set_length_internal(vector *this, size_t len);
+void __vector_set_ptr_internal(vector *this, void *ptr);
+void __vector_set_capacity_internal(vector *this, size_t cap);
 
 bool vector_init(vector *uninit_vec, vector_allocator_t allocator,
                  size_t elem_size, size_t init_cap, void (*destructor)(void *));
@@ -68,13 +102,13 @@ bool vector_is_full(const vector *this);
 size_t vector_size_of(const vector *this);
 void vector_clear(vector *this);
 void vector_deinit(vector *this);
-void vector_deinit_zeroized(vector *__this);
+void vector_deinit_zeroized(vector *this);
 bool vector_adjust_cap_if_full(vector *this, size_t n);
 bool vector_adjust_exact_cap_if_full(vector *this, size_t n);
 bool vector_push(vector *this, const void *element);
 bool vector_push_within_inner(vector *this, const void *element);
 void vector_push_within_inner_unchecked(vector *this, const void *element);
-void vector_pop(vector *__this);
+void vector_pop(vector *this);
 bool vector_insert(vector *this, size_t position, const void *element);
 bool vector_insert_within_inner(vector *this, size_t position,
                                 const void *element);
@@ -95,17 +129,18 @@ bool vector_pushf_within_inner(vector *this, const void *element);
 void vector_pushf_within_inner_unchecked(vector *this, const void *element);
 void vector_popf(vector *this);
 void vector_remove(vector *this, size_t position);
-void vector_remove_range(vector *this, size_t start, size_t end);
-void vector_leak(vector *__this, size_t position);
-void vector_leak_unchecked(vector *__this, size_t position);
-void vector_leak_range(vector *__this, size_t start, size_t len);
-void vector_leak_range_unchecked(vector *__this, size_t start, size_t len);
+void vector_remove_range(vector *this, size_t start, size_t len);
+void vector_leak(vector *this, size_t position);
+void vector_leak_unchecked(vector *this, size_t position);
+void vector_leak_range(vector *this, size_t start, size_t len);
+void vector_leak_range_unchecked(vector *this, size_t start, size_t len);
 void vector_swap_elems(vector *this, size_t a, size_t b);
 bool vector_shrink_to_fit(vector *this);
 void vector_from_raw_parts(vector *uninit_vec, vector_allocator_t allocator,
                            void *ptr, size_t elem_size, size_t len,
                            size_t capacity, void (*destructor)(void *));
 size_t vector_elem_get_offset(const vector *this, const void *element);
+size_t vector_elem_get_index(const vector *this, const void *element);
 void *vector_uninitialized_data(const vector *this);
 size_t vector_uninitialized_size_of(const vector *this);
 size_t vector_uninitialized_length(const vector *this);
@@ -113,5 +148,44 @@ void *vector_index_to_ptr_unchecked(const vector *this, size_t position);
 void *vector_first_to_ptr_unchecked(const vector *this);
 void *vector_last_to_ptr_unchecked(const vector *this);
 void vector_append_from_capacity(vector *this, size_t n);
+
+typedef struct string {
+  vector _vec;
+} string;
+
+bool str_init(string *str_uninit, vector_allocator_t allocator,
+              size_t init_cap);
+bool str_clone(const string *this, string *str_uninit);
+bool str_clone_slice(const string *this, string *str_uninit, int64_t start,
+                     int64_t end);
+bool str_from_cstr(string *str_uninit, vector_allocator_t allocator,
+                   size_t max_len, const unsigned char *cstr);
+void str_from_raw_parts(string *str_uninit, vector_allocator_t allocator,
+                        unsigned char *buf, size_t len, size_t capacity);
+bool str_from_format(string *str_uninit, vector_allocator_t allocator,
+                     size_t max_len, const char *format, ...);
+void str_deinit(string *this);
+size_t str_length(const string *this);
+bool str_is_empty(const string *this);
+void str_clear(string *this);
+unsigned char *str_index_to_ptr(const string *this, ssize_t position);
+bool str_push_char(string *this, unsigned char byte);
+bool str_push_cstr(string *this, size_t max_len, const unsigned char *cstr);
+bool str_append(string *this, const string *other);
+bool str_append_format(string *this, size_t max_len, const char *format, ...);
+int str_pop_char(string *this);
+bool str_pushf_char(string *this, unsigned char byte);
+int str_popf_char(string *this);
+bool str_insert_char(string *this, size_t position, unsigned char byte);
+bool str_insert_cstr(string *this, size_t position, size_t max_len,
+                     const unsigned char *cstr);
+bool str_insert_other(string *this, size_t position, const string *other);
+bool str_insert_format(string *this, size_t position, size_t max_len,
+                       const char *format, ...);
+void str_remove(string *this, size_t position);
+void str_remove_range(string *this, size_t start, size_t end);
+void str_truncate(string *this, size_t len);
+bool str_shrink_to_fit(string *this);
+void str_leak_cstr(string *this, unsigned char **out_buf);
 
 #endif /* __VECTOR_H__ */

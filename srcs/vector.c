@@ -1,95 +1,139 @@
 #include "vector.h"
 
-/* Overrides the vector's internal length value.
- * Note: This only updates the stored length; it does not modify
- * or resize the underlying buffer.
+/* Sets the vector's stored length without touching the underlying buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
 inline __attribute__((always_inline)) void
-__vector_set_length_internal(vector *__this, size_t len) {
-  __this->_len = len;
+__vector_set_length_internal(vector *this, size_t len) {
+  __bug_if_fail__(this != NULL);
+
+  this->_len = len;
 }
 
-/* Overrides the vector's internal element size value.
- * Note: This only updates the stored element size; it does not modify
- * or resize the underlying buffer.
+/* Sets the vector's stored element size without touching the underlying
+ * buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
 inline __attribute__((always_inline)) void
-__vector_set_elem_size_internal(vector *__this, size_t elem_size) {
-  __this->_elem_size = elem_size;
+__vector_set_elem_size_internal(vector *this, size_t elem_size) {
+  __bug_if_fail__(this != NULL);
+
+  this->_elem_size = elem_size;
 }
 
-/* Overrides the vector's internal capacity value.
- * Note: This only updates the stored capacity; it does not modify
- * or resize the underlying buffer.
+/* Sets the vector's stored capacity without touching the underlying
+ * buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
 inline __attribute__((always_inline)) void
-__vector_set_capacity_internal(vector *__this, size_t cap) {
-  __this->_capacity = cap;
+__vector_set_capacity_internal(vector *this, size_t cap) {
+  __bug_if_fail__(this != NULL);
+
+  this->_capacity = cap;
 }
 
-/* Overrides the vector's internal pointer value.
- * Note: This only updates the stored pointer; it does not modify
- * or resize the underlying buffer.
+/* Sets the vector's stored buffer pointer without freeing the previous
+ * one.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
 inline __attribute__((always_inline)) void
-__vector_set_ptr_internal(vector *__this, void *ptr) {
-  __this->_ptr = ptr;
+__vector_set_ptr_internal(vector *this, void *ptr) {
+  __bug_if_fail__(this != NULL);
+
+  this->_ptr = ptr;
 }
 
-/* Overrides the vector's internal destructor function pointer.
- * Note: This only updates the stored pointer; it does not modify
- * or resize the underlying buffer.
+/* Sets the vector's destructor function pointer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
 inline __attribute__((always_inline)) void
-__vector_set_destructor_internal(vector *__this, void (*destructor)(void *)) {
-  __this->_destructor = destructor;
+__vector_set_destructor_internal(vector *this, void (*destructor)(void *)) {
+  __bug_if_fail__(this != NULL);
+
+  this->_destructor = destructor;
 }
 
-/* Internal vector buffer allocation function. It uses the allocator provided
- * by the call to `vector_init`
+/* Allocates the vector's initial buffer using the configured allocator
+ * and stores the resulting pointer.
+ *
+ * Preconditions: `this` is a valid vector with its allocator set, and
+ * the buffer has not yet been allocated.
+ * Returns: true on success, false on allocation failure.
  */
-inline bool __vector_alloc_internal(vector *__this, size_t init_size) {
-  __this->_ptr = __this->_allocator.alloc(init_size);
-  return (__this->_ptr != NULL);
-}
+__no_discard bool __vector_alloc(vector *this, size_t init_size) {
+  __bug_if_fail__(this != NULL);
 
-/* Internal vector buffer reallocation function. It uses the allocator provided
- * by the call to `vector_init`
- */
-inline bool __vector_realloc_internal(vector *__this, size_t new_size) {
-  void *pointer = __this->_allocator.alloc(new_size);
-  if (unlikely(pointer == NULL)) {
+  void *p;
+
+  p = this->_allocator.alloc(init_size);
+  if (unlikely(p == NULL)) {
     return (false);
   }
 
-  (void)__memcpy(pointer, vector_first_to_ptr_unchecked(__this),
-                 __this->_len * vector_elem_size(__this));
+  __vector_set_ptr_internal(this, p);
+  return (true);
+}
 
-  __this->_allocator.release(vector_first_to_ptr_unchecked(__this));
+/* Grows the buffer by allocating a new one, copying the live portion
+ * across, releasing the old one, and updating the pointer and capacity.
+ *
+ * Preconditions: `this` is a valid initialised vector whose existing
+ * contents fit in `new_size` bytes.
+ * Returns: true on success. On failure the vector is unchanged.
+ */
+__no_discard bool __vector_realloc(vector *this, size_t new_size) {
+  __bug_if_fail__(this != NULL);
 
-  __vector_set_ptr_internal(__this, pointer);
-  __vector_set_capacity_internal(__this, new_size);
+  void *p;
+
+  p = this->_allocator.alloc(new_size);
+  if (unlikely(p == NULL)) {
+    return (false);
+  }
+
+  (void)__memcpy(p, vector_first_to_ptr_unchecked(this),
+                 this->_len * vector_elem_size(this));
+
+  this->_allocator.release(vector_first_to_ptr_unchecked(this));
+
+  __vector_set_ptr_internal(this, p);
+  __vector_set_capacity_internal(this, new_size);
 
   return (true);
 }
 
-/* Creates a vector and adjusts its starting capacity to be at least
- * enough to hold `n` elements.
- * Note: This function assumes that the vector pointer `uninit_vec` is
- * uninitialized *BUT* valid. The pointer must point to a buffer that holds
- * at least `sizeof(vector)` bytes.
+/* Initialises a vector in caller provided storage with enough capacity
+ * to hold at least `init_cap` elements of `elem_size`. An
+ * `init_cap` of 0 selects a default starting capacity.
+ *
+ * Preconditions: `uninit_vec` points to at least `sizeof(vector)` bytes
+ * of writable storage. `elem_size` is non-zero. `allocator` is a valid
+ * allocator pair.
+ *
+ * On success the vector is empty (length 0) and may be used with any
+ * vector operation. On failure no buffer has been allocated and the
+ * caller has no cleanup to perform.
  */
-bool vector_init(vector *uninit_vec, vector_allocator_t allocator,
-                 size_t elem_size, size_t init_cap, void (*destroy)(void *)) {
-  size_t capacity = elem_size * (init_cap == 0 ? MIN_CAP : init_cap);
+__no_discard bool vector_init(vector *uninit_vec, vector_allocator_t allocator,
+                              size_t elem_size, size_t init_cap,
+                              void (*destroy)(void *)) {
+  __bug_if_fail__(uninit_vec != NULL);
+  __bug_if_fail__(elem_size != 0);
+  __bug_if_fail__(allocator.alloc != NULL);
+  __bug_if_fail__(allocator.release != NULL);
+
+  const size_t capacity = elem_size * (init_cap == 0 ? MIN_CAP : init_cap);
 
   (void)__memset(uninit_vec, 0x00, sizeof(vector));
 
   uninit_vec->_allocator = allocator;
 
-  __vector_alloc_internal(uninit_vec, capacity);
-
-  if (unlikely(vector_first_to_ptr_unchecked(uninit_vec) == NULL)) {
+  if (unlikely(!__vector_alloc(uninit_vec, capacity))) {
     return (false);
   }
 
@@ -100,602 +144,815 @@ bool vector_init(vector *uninit_vec, vector_allocator_t allocator,
   return (true);
 }
 
-/* Returns the number of elements contained in the vector.
+/* Returns the number of elements currently held by the vector.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline __attribute__((always_inline)) size_t
-vector_length(const vector *__this) {
-  return (__this->_len);
+__pure1 inline __attribute__((always_inline)) size_t
+vector_length(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  return (this->_len);
 }
 
-/* Returns the number of bytes required for one element.
+/* Returns the size in bytes of one element of the vector.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline __attribute__((always_inline)) size_t
-vector_elem_size(const vector *__this) {
-  return (__this->_elem_size);
+__pure1 inline __attribute__((always_inline)) size_t
+vector_elem_size(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  return (this->_elem_size);
 }
 
-/* Returns the number of bytes currently allocated for the
- * internal buffer.
+/* Returns the number of bytes currently allocated for the internal
+ * buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline __attribute__((always_inline)) size_t
-vector_capacity(const vector *__this) {
-  return (__this->_capacity);
+__pure1 inline __attribute__((always_inline)) size_t
+vector_capacity(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  return (this->_capacity);
 }
 
-/* Applies the (assumed to be) provided destructor on the
- * element at `position`.
- * Note: No checks are done, it's up to the caller to make sure
- * `position` is within bounds, and that a destructor exists.
+/* Applies the configured destructor to the element at `position`.
+ *
+ * Preconditions: `this` is a valid initialised vector, `position` is
+ * a valid index in [0, length), and a destructor has been configured.
  */
 inline __attribute__((always_inline)) void
-vector_index_apply_destructor_unchecked(const vector *__this, size_t position) {
-  __this->_destructor(vector_index_to_ptr_unchecked(__this, position));
+vector_index_apply_destructor_unchecked(const vector *this, size_t position) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(this->_destructor != NULL);
+  __bug_if_fail__(position < vector_length(this));
+
+  this->_destructor(vector_index_to_ptr_unchecked(this, position));
 }
 
-/* Applies the (assumed to be) provided destructor on the
- * elements in the range `start` -> `end`.
- * Note: No checks are done, it's up to the caller to make sure
- * `start` and `end are valid, and that a destructor exists.
+/* Applies the configured destructor to each element in the half-open
+ * range `[start, end)`.
+ *
+ * Preconditions: `this` is a valid initialised vector, `start` and
+ * `end` define a valid sub-range of the vector, and a destructor has
+ * been configured.
  */
 inline __attribute__((always_inline)) void
-vector_apply_destructor_in_range_unchecked(const vector *__this, size_t start,
+vector_apply_destructor_in_range_unchecked(const vector *this, size_t start,
                                            size_t end) {
-  size_t i = end - start;
-  while (i--) {
-    vector_index_apply_destructor_unchecked(__this, start + i);
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(start <= end);
+  __bug_if_fail__(end <= vector_length(this));
+
+  size_t remaining;
+
+  remaining = end - start;
+  while (remaining--) {
+    vector_index_apply_destructor_unchecked(this, start + remaining);
   }
 }
 
-/* Returns true if the vector contains no elements.
+/* Returns true when the vector contains no elements.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline __attribute__((always_inline)) bool
-vector_is_empty(const vector *__this) {
-  return (vector_length(__this) == 0);
+__pure1 inline __attribute__((always_inline)) bool
+vector_is_empty(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  return (vector_length(this) == 0);
 }
 
-/* Returns true if the vector has a destructor.
- */
-inline __attribute__((always_inline)) bool
-vector_has_destructor(const vector *__this) {
-  return (__this->_destructor != NULL);
-}
-
-/* Returns true if the vector cannot hold additional elements
- * without having to reallocate it's internal buffer.
- */
-inline __attribute__((always_inline)) bool
-vector_is_full(const vector *__this) {
-  return (vector_size_of(__this) == vector_capacity(__this));
-}
-
-/* Returns the number of bytes in used by the vector's internal buffer.
- * Note: The value returned only concerns the internal buffer, and not the
- * size of the vector struct itself.
- */
-inline __attribute__((always_inline)) size_t
-vector_size_of(const vector *__this) {
-  return (vector_length(__this) * vector_elem_size(__this));
-}
-
-/* Returns a pointer to the element at the specified position.
- * Note: Be cautious when holding pointers to the vector’s internal
- * buffer. Many vector operations may reallocate the buffer, which
- * invalidates any existing pointers and leaves them dangling.
- * Whenever possible, prefer storing indices instead of pointers, or
- * at least avoid keeping pointers until the vector has reached what
- * is expected to be its final size.
- */
-inline __attribute__((always_inline)) void *
-vector_index_to_ptr(const vector *__this, size_t position) {
-  if (likely(position < vector_length(__this))) {
-    return (vector_index_to_ptr_unchecked(__this, position));
-  }
-
-  return (NULL);
-}
-
-/* Returns a pointer to the element at the specified position.
- * Note: Zero bound checks are done.
- * Note: Be cautious when holding pointers to the vector’s internal
- * buffer. Many vector operations may reallocate the buffer, which
- * invalidates any existing pointers and leaves them dangling.
- * Whenever possible, prefer storing indices instead of pointers, or
- * at least avoid keeping pointers until the vector has reached what
- * is expected to be its final size.
- */
-inline __attribute__((always_inline)) void *
-vector_index_to_ptr_unchecked(const vector *__this, size_t position) {
-  return (((char *)vector_first_to_ptr_unchecked(__this) +
-           vector_elem_size(__this) * position));
-}
-
-/* Returns the first element of the vector.
- * Note: Be cautious when holding pointers to the vector’s internal
- * buffer. Many vector operations may reallocate the buffer, which
- * invalidates any existing pointers and leaves them dangling.
- * Whenever possible, prefer storing indices instead of pointers, or
- * at least avoid keeping pointers until the vector has reached what
- * is expected to be its final size.
- */
-inline __attribute__((always_inline)) void *
-vector_first_to_ptr(const vector *__this) {
-  if (likely(!vector_is_empty(__this))) {
-    return (vector_first_to_ptr_unchecked(__this));
-  }
-
-  return (NULL);
-}
-
-/* Returns the first element of the vector.
- * Note: Zero bound checks are done.
- * Note: Be cautious when holding pointers to the vector’s internal
- * buffer. Many vector operations may reallocate the buffer, which
- * invalidates any existing pointers and leaves them dangling.
- * Whenever possible, prefer storing indices instead of pointers, or
- * at least avoid keeping pointers until the vector has reached what
- * is expected to be its final size.
- */
-inline __attribute__((always_inline)) void *
-vector_first_to_ptr_unchecked(const vector *__this) {
-  return (__this->_ptr);
-}
-
-/* Returns the last element of the vector.
- * Note: Be cautious when holding pointers to the vector’s internal
- * buffer. Many vector operations may reallocate the buffer, which
- * invalidates any existing pointers and leaves them dangling.
- * Whenever possible, prefer storing indices instead of pointers, or
- * at least avoid keeping pointers until the vector has reached what
- * is expected to be its final size.
- */
-inline __attribute__((always_inline)) void *
-vector_last_to_ptr(const vector *__this) {
-  if (likely(!vector_is_empty(__this))) {
-    return (vector_last_to_ptr_unchecked(__this));
-  }
-
-  return (NULL);
-}
-
-/* Returns the last element of the vector.
- * Note: Zero bound checks are done.
- * Note: Be cautious when holding pointers to the vector’s internal
- * buffer. Many vector operations may reallocate the buffer, which
- * invalidates any existing pointers and leaves them dangling.
- * Whenever possible, prefer storing indices instead of pointers, or
- * at least avoid keeping pointers until the vector has reached what
- * is expected to be its final size.
- */
-inline __attribute__((always_inline)) void *
-vector_last_to_ptr_unchecked(const vector *__this) {
-  return (vector_index_to_ptr_unchecked(__this, vector_length(__this) - 1));
-}
-
-/* Removes all the elements from the vector.
- * If a destructor was provided on initialization, it is applied to each
+/* Returns true when a destructor has been configured for the vector's
  * elements.
- * Note: The capacity will remain unchanged.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline void vector_clear(vector *__this) {
-  if (vector_has_destructor(__this)) {
-    vector_apply_destructor_in_range_unchecked(__this, 0,
-                                               vector_length(__this));
+__pure1 inline __attribute__((always_inline)) bool
+vector_has_destructor(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  return (this->_destructor != NULL);
+}
+
+/* Returns true when the buffer cannot accept another element without
+ * being reallocated.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ */
+__pure1 inline __attribute__((always_inline)) bool
+vector_is_full(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  return (vector_size_of(this) == vector_capacity(this));
+}
+
+/* Returns the number of bytes occupied by the live portion of the
+ * buffer. This does not include the unused tail of the allocation.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ */
+__pure1 inline __attribute__((always_inline)) size_t
+vector_size_of(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  return (vector_length(this) * vector_elem_size(this));
+}
+
+/* These primitive pointer-returning accessors are the lowest layer of
+ * the container API: every higher-level operation in this module ends
+ * up calling one of them, and they are designed to compile away to a
+ * single addition on top of a struct field load. They return NULL only
+ * as a signal that the requested element does not exist; the
+ * `_unchecked` siblings return the address unconditionally. Both
+ * shapes are kept because the vector is used in inner loops where the
+ * extra parameter slot of an output-pointer convention would dominate
+ * the cost of the access.
+ */
+
+/* Returns a pointer to the element at `position`, or NULL if the
+ * position is out of bounds. The returned pointer is invalidated by
+ * any subsequent operation that may grow the buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ */
+__pure1 inline __attribute__((always_inline)) void *
+vector_index_to_ptr(const vector *this, size_t position) {
+  __bug_if_fail__(this != NULL);
+
+  if (likely(position < vector_length(this))) {
+    return (vector_index_to_ptr_unchecked(this, position));
   }
 
-  __vector_set_length_internal(__this, 0);
+  return (NULL);
 }
 
-/* Frees the vector internal buffer, clearing the content beforhand.
- * This function internally calls `vector_clear`, and then releases both
- * the vectors internal buffer. `__this` *MUST* be considered invalid
- * after having called this function on it. Though, it can be safely
- * passed to `vector_init` to initialize it again.
+/* Returns a pointer to the element at `position` without any bound
+ * check. The returned pointer is invalidated by any subsequent
+ * operation that may grow the buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector, `position` is
+ * a valid index within the buffer's capacity.
  */
-inline void vector_deinit(vector *__this) {
-  vector_clear(__this);
-  __this->_allocator.release(vector_first_to_ptr_unchecked(__this));
+__pure1 inline __attribute__((always_inline)) void *
+vector_index_to_ptr_unchecked(const vector *this, size_t position) {
+  __bug_if_fail__(this != NULL);
+
+  return (((char *)vector_first_to_ptr_unchecked(this) +
+           vector_elem_size(this) * position));
 }
 
-/* Frees the vector internal buffer, clearing the content and zeroizing
- * the buffer beforhand.
- * This function internally calls `vector_clear`, and then releases both
- * the vectors internal buffer. `__this` *MUST* be considered invalid
- * after having called this function on it. Though, it can be safely
- * passed to `vector_init` to initialize it again.
+/* Returns a pointer to the first element of the vector, or NULL if
+ * the vector is empty. The returned pointer is invalidated by any
+ * subsequent operation that may grow the buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline void vector_deinit_zeroized(vector *__this) {
-  if (likely(vector_capacity(__this))) {
-    __memset(vector_first_to_ptr_unchecked(__this), 0, vector_capacity(__this));
+__pure1 inline __attribute__((always_inline)) void *
+vector_first_to_ptr(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  if (likely(!vector_is_empty(this))) {
+    return (vector_first_to_ptr_unchecked(this));
   }
 
-  __this->_allocator.release(vector_first_to_ptr_unchecked(__this));
+  return (NULL);
 }
 
-/* Adjusts the vector capacity to be at least enough to
- * contain an additional `n` elements.
+/* Returns a pointer to the first byte of the internal buffer. The
+ * returned pointer is invalidated by any subsequent operation that
+ * may grow the buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-bool vector_adjust_cap_if_full(vector *__this, size_t n) {
-  n += vector_length(__this);
-  n *= vector_elem_size(__this);
+__pure1 inline __attribute__((always_inline)) void *
+vector_first_to_ptr_unchecked(const vector *this) {
+  __bug_if_fail__(this != NULL);
 
-  if (likely(n < vector_capacity(__this))) {
+  return (this->_ptr);
+}
+
+/* Returns a pointer to the last element of the vector, or NULL if
+ * the vector is empty. The returned pointer is invalidated by any
+ * subsequent operation that may grow the buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ */
+__pure1 inline __attribute__((always_inline)) void *
+vector_last_to_ptr(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  if (likely(!vector_is_empty(this))) {
+    return (vector_last_to_ptr_unchecked(this));
+  }
+
+  return (NULL);
+}
+
+/* Returns a pointer to the last element of the vector without any
+ * bound check. The returned pointer is invalidated by any subsequent
+ * operation that may grow the buffer.
+ *
+ * Preconditions: `this` is a valid initialised non-empty vector.
+ */
+__pure1 inline __attribute__((always_inline)) void *
+vector_last_to_ptr_unchecked(const vector *this) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(!vector_is_empty(this));
+
+  return (vector_index_to_ptr_unchecked(this, vector_length(this) - 1));
+}
+
+/* Removes every element from the vector, applying the configured
+ * destructor to each one if a destructor was registered. The
+ * capacity is preserved.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ */
+inline void vector_clear(vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  if (vector_has_destructor(this)) {
+    vector_apply_destructor_in_range_unchecked(this, 0, vector_length(this));
+  }
+
+  __vector_set_length_internal(this, 0);
+}
+
+/* Clears the vector and releases the internal buffer. After this call
+ * the vector is uninitialised and may only be reused by passing it to
+ * `vector_init` again.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ */
+inline void vector_deinit(vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  vector_clear(this);
+  this->_allocator.release(vector_first_to_ptr_unchecked(this));
+}
+
+/* Zeroes the entire internal buffer and releases it. After this call
+ * the vector is uninitialised and may only be reused by passing it to
+ * `vector_init` again. Intended for buffers that held sensitive data.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ */
+inline void vector_deinit_zeroized(vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  if (likely(vector_capacity(this))) {
+    (void)__memset(vector_first_to_ptr_unchecked(this), 0,
+                   vector_capacity(this));
+  }
+
+  this->_allocator.release(vector_first_to_ptr_unchecked(this));
+}
+
+/* Ensures the buffer has room for at least `n` additional elements,
+ * growing it if necessary. Growth at least doubles the capacity.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ * Returns: true on success. On failure the vector is unchanged.
+ */
+__no_discard bool vector_adjust_cap_if_full(vector *this, size_t n) {
+  __bug_if_fail__(this != NULL);
+
+  size_t need;
+  size_t twice_capacity;
+
+  need = (n + vector_length(this)) * vector_elem_size(this);
+
+  if (likely(need < vector_capacity(this))) {
     return (true);
   }
 
-  size_t twice_capacity = vector_capacity(__this) * 2;
+  twice_capacity = vector_capacity(this) * 2;
   if (twice_capacity < MIN_CAP) {
     twice_capacity = MIN_CAP;
   }
 
-  return (
-      likely(__vector_realloc_internal(
-                 __this, n > twice_capacity ? n : twice_capacity) != false));
+  return (likely(
+      __vector_realloc(this, need > twice_capacity ? need : twice_capacity) !=
+      false));
 }
 
-/* Adjusts the vector capacity to have the exact amount of capacity
- * to hold an additional 'n' elements *UNLESS* enough capacity already
- * exists. No truncation is done in that case and the buffer remains
- * unchanged.
+/* Ensures the buffer has room for exactly `n` additional elements,
+ * growing it only if necessary. Unlike `vector_adjust_cap_if_full` no
+ * geometric overshoot is performed.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ * Returns: true on success. On failure the vector is unchanged.
  */
-inline bool vector_adjust_exact_cap_if_full(vector *__this, size_t n) {
-  n += vector_length(__this);
-  n *= vector_elem_size(__this);
+__no_discard inline bool vector_adjust_exact_cap_if_full(vector *this,
+                                                         size_t n) {
+  __bug_if_fail__(this != NULL);
 
-  if (likely(n < vector_capacity(__this))) {
+  size_t need;
+
+  need = (n + vector_length(this)) * vector_elem_size(this);
+
+  if (likely(need < vector_capacity(this))) {
     return (true);
   }
 
-  return (likely(__vector_realloc_internal(__this, n)));
+  return (likely(__vector_realloc(this, need)));
 }
 
-/* Adds a new element at the end of the vector, after its current
- * last element. The data pointed to by `e` is copied to the
- * new element.
- * Note: internally calls `memmove` with the pointer provided. The
- * pointer itself is not copied but the value pointed by it.
+/* Appends one element to the end of the vector, copying `elem_size`
+ * bytes from `element` into the buffer. Grows the buffer if needed.
+ *
+ * Preconditions: `this` is a valid initialised vector and `element`
+ * points to at least `elem_size` readable bytes that do not overlap
+ * the vector's buffer.
+ * Returns: true on success. On failure the vector is unchanged.
  */
-inline bool vector_push(vector *__this, const void *element) {
-  if (unlikely(!vector_adjust_cap_if_full(__this, 1))) {
+__no_discard inline bool vector_push(vector *this, const void *element) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
+  if (unlikely(!vector_adjust_cap_if_full(this, 1))) {
     return (false);
   }
 
-  vector_push_within_inner_unchecked(__this, element);
+  vector_push_within_inner_unchecked(this, element);
 
   return (true);
 }
 
-/* Adds a new element at the end of the vector, after its current
- * last element. The data pointed to by 'e' is copied to the
- * new element.
- * Note: The function returns false if the internal buffer must be
- * reallocated. Calling this function does not invalidate existing
- * pointers to elements within the buffer.
+/* Appends one element to the end of the vector without growing the
+ * buffer. Returns false if the buffer is already full, in which case
+ * any existing pointers into the buffer remain valid.
+ *
+ * Preconditions: `this` is a valid initialised vector and `element`
+ * points to at least `elem_size` readable bytes that do not overlap
+ * the vector's buffer.
  */
-inline bool vector_push_within_inner(vector *__this, const void *element) {
-  if (unlikely(vector_size_of(__this) + vector_elem_size(__this) * 1 >
-               vector_capacity(__this))) {
+__no_discard inline bool vector_push_within_inner(vector *this,
+                                                  const void *element) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
+  if (unlikely(vector_size_of(this) + vector_elem_size(this) * 1 >
+               vector_capacity(this))) {
     return (false);
   }
 
-  vector_push_within_inner_unchecked(__this, element);
+  vector_push_within_inner_unchecked(this, element);
 
   return (true);
 }
 
-/* Adds a new element at the end of the vector, after its current
- * last element. The data pointed to by 'e' is copied to the
- * new element.
- * Note: No bound checks are done by this function.
+/* Appends one element to the end of the vector without any capacity
+ * check.
+ *
+ * Preconditions: `this` is a valid initialised vector, `element`
+ * points to at least `elem_size` readable bytes that do not overlap
+ * the vector's buffer, and at least one element of capacity remains.
  */
-inline void vector_push_within_inner_unchecked(vector *__this,
+inline void vector_push_within_inner_unchecked(vector *this,
                                                const void *element) {
-  (void)__memmove(vector_uninitialized_data(__this), element,
-                  vector_elem_size(__this));
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
 
-  vector_append_from_capacity(__this, 1);
+  (void)__memmove(vector_uninitialized_data(this), element,
+                  vector_elem_size(this));
+
+  vector_append_from_capacity(this, 1);
 }
 
-/* Removes the last element of the vector, effectively reducing
- * the container size by one.
+/* Removes the last element of the vector, applying the configured
+ * destructor if one was registered. Popping from an empty vector is a
+ * no-op.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline void vector_pop(vector *__this) {
-  if (unlikely(vector_length(__this) == 0)) {
+inline void vector_pop(vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  if (unlikely(vector_length(this) == 0)) {
     return;
   }
 
-  if (vector_has_destructor(__this)) {
-    vector_index_apply_destructor_unchecked(__this, vector_length(__this) - 1);
+  if (vector_has_destructor(this)) {
+    vector_index_apply_destructor_unchecked(this, vector_length(this) - 1);
   }
 
-  __vector_set_length_internal(__this, vector_length(__this) - 1);
+  __vector_set_length_internal(this, vector_length(this) - 1);
 }
 
-/* The vector is extended by injecting a new element before the
- * element at the specified position, effectively increasing
- * the vector's size by one. Inserting in the vector can only happen
- * *BEFORE* and existing element, so the vector must have at least one
- * element for this method to work.
- * Insertion is permitted only before an existing element. Consequently,
- * this method requires the vector to contain at least one item.
+/* Inserts an element before the element at `position`, shifting every
+ * subsequent element one slot to the right. Insertion at the current
+ * end is not supported by this function; the vector must contain at
+ * least one element and `position` must be strictly less than the
+ * current length.
+ *
+ * Preconditions: `this` is a valid initialised vector and `element`
+ * points to at least `elem_size` readable bytes that do not overlap
+ * the vector's buffer.
+ * Returns: true on success. On failure the vector is unchanged.
  */
-inline bool vector_insert(vector *__this, size_t position,
-                          const void *element) {
-  if (unlikely(position >= vector_length(__this)) ||
-      unlikely(!vector_adjust_cap_if_full(__this, 1))) {
-    return (false);
-  }
-
-  vector_insert_within_inner_unchecked(__this, position, element);
-
-  return (true);
-}
-
-/* The vector is extended by injecting a new element before the
- * element at the specified position, effectively increasing the vector's size
- * by one.
- * Insertion is permitted only before an existing element. Consequently,
- * this method requires the vector to contain at least one item.
- * Note: The function returns false if the internal buffer must be
- * reallocated. Calling this function does not invalidate existing
- * pointers to elements within the buffer.
- */
-inline bool vector_insert_within_inner(vector *__this, size_t position,
+__no_discard inline bool vector_insert(vector *this, size_t position,
                                        const void *element) {
-  if (unlikely(position >= vector_length(__this)) ||
-      unlikely((vector_size_of(__this) + vector_elem_size(__this) * 1) >
-               vector_capacity(__this))) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
+  if (unlikely(position >= vector_length(this)) ||
+      unlikely(!vector_adjust_cap_if_full(this, 1))) {
     return (false);
   }
 
-  vector_insert_within_inner_unchecked(__this, position, element);
+  vector_insert_within_inner_unchecked(this, position, element);
 
   return (true);
 }
 
-/* The vector is extended by injecting a new element before the
- * element at the specified position, effectively increasing the vector's size
- * by one.
- * Insertion is permitted only before an existing element. Consequently,
- * this method requires the vector to contain at least one item.
- * Note: No bound checks are done by this function.
+/* Inserts an element before the element at `position` without growing
+ * the buffer. Returns false if `position` is invalid or the buffer is
+ * already full; in either case any existing pointers into the buffer
+ * remain valid.
+ *
+ * Preconditions: `this` is a valid initialised vector and `element`
+ * points to at least `elem_size` readable bytes that do not overlap
+ * the vector's buffer.
  */
-inline void vector_insert_within_inner_unchecked(vector *__this,
-                                                 size_t position,
+__no_discard inline bool
+vector_insert_within_inner(vector *this, size_t position, const void *element) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
+  if (unlikely(position >= vector_length(this)) ||
+      unlikely((vector_size_of(this) + vector_elem_size(this) * 1) >
+               vector_capacity(this))) {
+    return (false);
+  }
+
+  vector_insert_within_inner_unchecked(this, position, element);
+
+  return (true);
+}
+
+/* Inserts an element before the element at `position` without any
+ * capacity or bound check.
+ *
+ * Preconditions: `this` is a valid initialised vector, `position` is
+ * a valid index within the current length, `element` points to at
+ * least `elem_size` readable bytes that do not overlap the vector's
+ * buffer, and at least one element of capacity remains.
+ */
+inline void vector_insert_within_inner_unchecked(vector *this, size_t position,
                                                  const void *element) {
-  (void)__memmove((char *)vector_index_to_ptr_unchecked(__this, position + 1),
-                  (char *)vector_index_to_ptr_unchecked(__this, position),
-                  vector_size_of(__this) - position * vector_elem_size(__this));
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
 
-  (void)__memcpy((char *)vector_index_to_ptr_unchecked(__this, position),
-                 element, vector_elem_size(__this));
+  (void)__memmove((char *)vector_index_to_ptr_unchecked(this, position + 1),
+                  (char *)vector_index_to_ptr_unchecked(this, position),
+                  vector_size_of(this) - position * vector_elem_size(this));
 
-  vector_append_from_capacity(__this, 1);
+  (void)__memcpy((char *)vector_index_to_ptr_unchecked(this, position), element,
+                 vector_elem_size(this));
+
+  vector_append_from_capacity(this, 1);
 }
 
-/* Injects 'n' elements pointed to by 'src' into the vector, at
- * potitions 'p'.
+/* Inserts `len` contiguous elements pointed to by `src` into the
+ * vector starting at `position`. `position` may equal the current
+ * length, in which case the elements are appended. Grows the buffer
+ * if needed.
+ *
+ * Preconditions: `this` is a valid initialised vector and `src`
+ * points to at least `len * elem_size` readable bytes that do not
+ * overlap the vector's buffer.
+ * Returns: true on success. On failure the vector is unchanged.
  */
-inline bool vector_copy_contiguous(vector *__this, size_t position,
-                                   const void *src, size_t len) {
-  if (unlikely(position > vector_length(__this)) ||
-      unlikely(!vector_adjust_cap_if_full(__this, len))) {
+__no_discard inline bool vector_copy_contiguous(vector *this, size_t position,
+                                                const void *src, size_t len) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(src != NULL || len == 0);
+
+  if (unlikely(position > vector_length(this)) ||
+      unlikely(!vector_adjust_cap_if_full(this, len))) {
     return (false);
   }
 
-  vector_copy_contiguous_within_inner_unchecked(__this, position, src, len);
+  vector_copy_contiguous_within_inner_unchecked(this, position, src, len);
 
   return (true);
 }
 
-/* Injects `n` elements pointed to by `src` into the vector, at
- * potitions `p`.
- * Note: The function returns false if the internal buffer must be
- * reallocated. Calling this function does not invalidate existing
- * pointers to elements within the buffer.
+/* Inserts `len` contiguous elements at `position` without growing the
+ * buffer. Returns false if `position` is invalid or the buffer is too
+ * small; in either case any existing pointers into the buffer remain
+ * valid.
+ *
+ * Preconditions: `this` is a valid initialised vector and `src`
+ * points to at least `len * elem_size` readable bytes that do not
+ * overlap the vector's buffer.
  */
-bool vector_copy_contiguous_within_inner(vector *__this, size_t position,
-                                         const void *src, size_t len) {
-  if (unlikely(position > vector_length(__this)) ||
-      unlikely((vector_size_of(__this) + vector_elem_size(__this) * len) >
-               vector_capacity(__this))) {
+__no_discard inline bool vector_copy_contiguous_within_inner(vector *this,
+                                                             size_t position,
+                                                             const void *src,
+                                                             size_t len) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(src != NULL || len == 0);
+
+  if (unlikely(position > vector_length(this)) ||
+      unlikely((vector_size_of(this) + vector_elem_size(this) * len) >
+               vector_capacity(this))) {
     return (false);
   }
 
-  vector_copy_contiguous_within_inner_unchecked(__this, position, src, len);
+  vector_copy_contiguous_within_inner_unchecked(this, position, src, len);
 
   return (true);
 }
 
-/* Injects `n` elements pointed to by `src` into the vector, at
- * potitions `p`.
- * Note: No bound checks are done by this function.
+/* Inserts `len` contiguous elements at `position` without any
+ * capacity or bound check.
+ *
+ * Preconditions: `this` is a valid initialised vector, `position`
+ * is in [0, length], `src` points to at least `len * elem_size`
+ * readable bytes that do not overlap the vector's buffer, and the
+ * buffer has at least `len` elements of free capacity.
  */
-void vector_copy_contiguous_within_inner_unchecked(vector *__this,
-                                                   size_t position,
-                                                   const void *src,
-                                                   size_t len) {
-  if (position < vector_length(__this)) {
-    (void)__memmove(
-        (char *)vector_index_to_ptr_unchecked(__this, position + len),
-        (char *)vector_index_to_ptr_unchecked(__this, position),
-        vector_elem_size(__this) * (vector_length(__this) - position));
+inline void vector_copy_contiguous_within_inner_unchecked(vector *this,
+                                                          size_t position,
+                                                          const void *src,
+                                                          size_t len) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(src != NULL || len == 0);
+
+  if (position < vector_length(this)) {
+    (void)__memmove((char *)vector_index_to_ptr_unchecked(this, position + len),
+                    (char *)vector_index_to_ptr_unchecked(this, position),
+                    vector_elem_size(this) * (vector_length(this) - position));
   }
 
-  (void)__memmove((char *)vector_index_to_ptr_unchecked(__this, position), src,
-                  vector_elem_size(__this) * len);
+  (void)__memmove((char *)vector_index_to_ptr_unchecked(this, position), src,
+                  vector_elem_size(this) * len);
 
-  vector_append_from_capacity(__this, len);
+  vector_append_from_capacity(this, len);
 }
 
-/* Adds a new element to the front of the vector, before the
- * first element. The content of `element` is copied by internally
- * calling `vector_insert`
+/* Inserts an element before the first element of the vector.
+ *
+ * Preconditions: `this` is a valid initialised vector and `element`
+ * points to at least `elem_size` readable bytes that do not overlap
+ * the vector's buffer.
+ * Returns: true on success. On failure the vector is unchanged.
  */
-inline __attribute__((always_inline)) bool vector_pushf(vector *__this,
-                                                        const void *element) {
-  return (vector_insert(__this, 0, element));
+__no_discard inline __attribute__((always_inline)) bool
+vector_pushf(vector *this, const void *element) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
+  if (unlikely(vector_is_empty(this))) {
+    return (vector_push(this, element));
+  }
+
+  return (vector_insert(this, 0, element));
 }
 
-/* Adds a new element to the front of the vector, before the
- * first element. The content of `element` is copied by internally
- * calling `vector_pushf_within_inner`
+/* Inserts an element before the first element of the vector without
+ * growing the buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector and `element`
+ * points to at least `elem_size` readable bytes that do not overlap
+ * the vector's buffer.
+ * Returns: true on success. On failure the vector is unchanged.
  */
-inline __attribute__((always_inline)) bool
-vector_pushf_within_inner(vector *__this, const void *element) {
-  return (vector_insert_within_inner(__this, 0, element));
+__no_discard inline __attribute__((always_inline)) bool
+vector_pushf_within_inner(vector *this, const void *element) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
+  if (unlikely(vector_is_empty(this))) {
+    return (vector_push_within_inner(this, element));
+  }
+
+  return (vector_insert_within_inner(this, 0, element));
 }
 
-/* Adds a new element to the front of the vector, before the
- * first element. The content of `element` is copied by internally
- * calling `vector_pushf_within_inner`.
- * Note: No bound checks are done by this function.
+/* Inserts an element before the first element of the vector without
+ * any capacity or bound check.
+ *
+ * Preconditions: `this` is a valid initialised vector containing at
+ * least one element, `element` points to at least `elem_size`
+ * readable bytes that do not overlap the vector's buffer, and at
+ * least one element of capacity remains.
  */
 inline __attribute__((always_inline)) void
-vector_pushf_within_inner_unchecked(vector *__this, const void *element) {
-  vector_insert_within_inner_unchecked(__this, 0, element);
+vector_pushf_within_inner_unchecked(vector *this, const void *element) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
+  if (unlikely(vector_is_empty(this))) {
+    vector_push_within_inner_unchecked(this, element);
+  } else {
+    vector_insert_within_inner_unchecked(this, 0, element);
+  }
 }
 
-/* Removes the first element from the vector, reducing
- * the container size by one.
+/* Removes the first element of the vector. Popping from an empty
+ * vector is a no-op.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline __attribute__((always_inline)) void vector_popf(vector *__this) {
-  vector_remove(__this, 0);
+inline __attribute__((always_inline)) void vector_popf(vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  vector_remove(this, 0);
 }
 
-/* Removes the element at position `position` from the vector,
- * decreasing the size by one.
+/* Removes the element at `position`, applying the destructor if one
+ * was registered. An out-of-range `position` is a no-op.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline void vector_remove(vector *__this, size_t position) {
-  if (unlikely(position >= vector_length(__this))) {
+inline void vector_remove(vector *this, size_t position) {
+  __bug_if_fail__(this != NULL);
+
+  if (unlikely(position >= vector_length(this))) {
     return;
   }
 
-  if (vector_has_destructor(__this)) {
-    vector_index_apply_destructor_unchecked(__this, position);
+  if (vector_has_destructor(this)) {
+    vector_index_apply_destructor_unchecked(this, position);
   }
 
-  vector_leak_unchecked(__this, position);
+  vector_leak_unchecked(this, position);
 }
 
-/* Removes `len` elements from the vector starting at index `start`,
- * leaving the vector with a length of vector_length() - len.
+/* Removes `len` elements starting at `start`, applying the destructor
+ * to each one if a destructor was registered. An invalid range is a
+ * no-op.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline void vector_remove_range(vector *__this, size_t start, size_t len) {
-  if (start > vector_length(__this) || len > vector_length(__this) - start) {
+inline void vector_remove_range(vector *this, size_t start, size_t len) {
+  __bug_if_fail__(this != NULL);
+
+  if (start > vector_length(this) || len > vector_length(this) - start) {
     return;
   }
 
-  if (vector_has_destructor(__this)) {
-    vector_apply_destructor_in_range_unchecked(__this, start, start + len);
+  if (vector_has_destructor(this)) {
+    vector_apply_destructor_in_range_unchecked(this, start, start + len);
   }
 
-  vector_leak_range_unchecked(__this, start, len);
+  vector_leak_range_unchecked(this, start, len);
 }
 
-/* Removes the element at position `position` from the vector, while
- * skipping using the destructor, decreasing the size by one.
+/* Removes the element at `position` without applying the destructor,
+ * transferring ownership of the element to the caller. An
+ * out-of-range `position` is a no-op.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline void vector_leak(vector *__this, size_t position) {
-  if (unlikely(position >= vector_length(__this))) {
+inline void vector_leak(vector *this, size_t position) {
+  __bug_if_fail__(this != NULL);
+
+  if (unlikely(position >= vector_length(this))) {
     return;
   }
 
-  vector_leak_unchecked(__this, position);
+  vector_leak_unchecked(this, position);
 }
 
-/* Removes the element at position `position` from the vector, while
- * skipping using the destructor, decreasing the size by one.
- * Note: no bound checks are done.
+/* Removes the element at `position` without applying the destructor
+ * and without any bound check, transferring ownership of the element
+ * to the caller.
+ *
+ * Preconditions: `this` is a valid initialised vector and `position`
+ * is a valid index in [0, length).
  */
-inline void vector_leak_unchecked(vector *__this, size_t position) {
-  size_t n = (vector_length(__this) - position) * vector_elem_size(__this);
+inline void vector_leak_unchecked(vector *this, size_t position) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(position < vector_length(this));
 
-  if (likely(position <= vector_length(__this))) {
-    (void)__memmove(vector_index_to_ptr_unchecked(__this, position),
-                    vector_index_to_ptr_unchecked(__this, position + 1),
-                    n - vector_elem_size(__this));
+  size_t tail_bytes;
+
+  tail_bytes = (vector_length(this) - position) * vector_elem_size(this);
+
+  if (likely(position <= vector_length(this))) {
+    (void)__memmove(vector_index_to_ptr_unchecked(this, position),
+                    vector_index_to_ptr_unchecked(this, position + 1),
+                    tail_bytes - vector_elem_size(this));
   }
 
-  __vector_set_length_internal(__this, vector_length(__this) - 1);
+  __vector_set_length_internal(this, vector_length(this) - 1);
 }
 
-/* Removes `len` elements from the vector starting at index `start`,
- * leaving the vector with a length of vector_length() - len.
- * Note: the element destructor is not applied.
+/* Removes `len` elements starting at `start` without applying the
+ * destructor, transferring ownership of those elements to the caller.
+ * An invalid range is a no-op.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline void vector_leak_range(vector *__this, size_t start, size_t len) {
-  if (start > vector_length(__this) || len > vector_length(__this) - start) {
+inline void vector_leak_range(vector *this, size_t start, size_t len) {
+  __bug_if_fail__(this != NULL);
+
+  if (start > vector_length(this) || len > vector_length(this) - start) {
     return;
   }
 
-  vector_leak_range_unchecked(__this, start, len);
+  vector_leak_range_unchecked(this, start, len);
 }
 
-/* Removes `len` elements from the vector starting at index `start`,
- * leaving the vector with a length of vector_length() - len.
- * Note: the element destructor is not applied.
- * Note: no bound checks are done.
+/* Removes `len` elements starting at `start` without applying the
+ * destructor and without any bound check.
+ *
+ * Preconditions: `this` is a valid initialised vector and `[start,
+ * start + len)` is a valid sub-range.
  */
-inline void vector_leak_range_unchecked(vector *__this, size_t start,
+inline void vector_leak_range_unchecked(vector *this, size_t start,
                                         size_t len) {
-  (void)__memmove(vector_index_to_ptr_unchecked(__this, start),
-                  vector_index_to_ptr_unchecked(__this, start + len),
-                  (vector_length(__this) - (start + len)) *
-                      vector_elem_size(__this));
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(start + len <= vector_length(this));
 
-  __vector_set_length_internal(__this, vector_length(__this) - len);
+  (void)__memmove(vector_index_to_ptr_unchecked(this, start),
+                  vector_index_to_ptr_unchecked(this, start + len),
+                  (vector_length(this) - (start + len)) *
+                      vector_elem_size(this));
+
+  __vector_set_length_internal(this, vector_length(this) - len);
 }
 
-/* The element at position `a` and the element at position `b`
- * are swapped.
+/* Swaps the elements at indices `a` and `b` in place, without
+ * allocating a temporary.
+ *
+ * Preconditions: `this` is a valid initialised vector and both `a`
+ * and `b` are valid indices in [0, length).
  */
-inline void vector_swap_elems(vector *__this, size_t a, size_t b) {
+inline void vector_swap_elems(vector *this, size_t a, size_t b) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(a < vector_length(this));
+  __bug_if_fail__(b < vector_length(this));
+
+  size_t remaining;
+  char *left;
+  char *right;
+
   if (a == b) {
     return;
   }
 
-  size_t n = vector_elem_size(__this);
+  remaining = vector_elem_size(this);
+  left = vector_index_to_ptr_unchecked(this, a);
+  right = vector_index_to_ptr_unchecked(this, b);
 
-  char *p = vector_index_to_ptr_unchecked(__this, a);
-  char *q = vector_index_to_ptr_unchecked(__this, b);
-
-  for (; n--; ++p, ++q) {
-    *p ^= *q;
-    *q ^= *p;
-    *p ^= *q;
+  for (; remaining--; ++left, ++right) {
+    *left ^= *right;
+    *right ^= *left;
+    *left ^= *right;
   }
 }
 
-/* Reallocates the vector internal buffer if more than half of the current
- * capacity is currently unused.
- * If this function returns false, the initial vector remains untouched.
+/* Reallocates the buffer to a tighter size if more than half of the
+ * current capacity is unused.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ * Returns: true on success or when no shrink was necessary. On
+ * allocation failure the vector is unchanged and false is returned.
  */
-inline bool vector_shrink_to_fit(vector *__this) {
-  if (vector_capacity(__this)) {
-    size_t size = vector_size_of(__this);
+__no_discard inline bool vector_shrink_to_fit(vector *this) {
+  __bug_if_fail__(this != NULL);
 
-    if (size < vector_capacity(__this) / 2) {
-      if (!__vector_realloc_internal(__this, size)) {
-        return (false);
-      }
-    }
+  size_t size;
+
+  if (vector_capacity(this) == 0) {
+    return (true);
   }
 
-  return (true);
+  size = vector_size_of(this);
+  if (size >= vector_capacity(this) / 2) {
+    return (true);
+  }
+
+  return (__vector_realloc(this, size));
 }
 
-/* Creates a vector directly from a pointer, a length, a capacity etc.
- * Nothing is computed by the vector itself, the values are simply copied
- * into the fresh vector.
- * Note: While providing an optimized way to build a vector, this is very
- * dangerous due to the number of invariants that aren’t checked. In fact
- * nothing is checked, it assumes the caller carefully checked that everything
- * is valid.
+/* Constructs a vector directly from caller-owned components without
+ * computing or validating anything. Intended for transferring an
+ * existing buffer into the vector model; the caller is responsible
+ * for the consistency of every argument.
+ *
+ * Preconditions: `uninit_vec` points to writable storage; `ptr` was
+ * obtained from `allocator`; `capacity` is the allocation size in
+ * bytes; `len * elem_size <= capacity`.
  */
 inline void vector_from_raw_parts(vector *uninit_vec,
                                   vector_allocator_t allocator, void *ptr,
                                   size_t elem_size, size_t len, size_t capacity,
                                   void (*destructor)(void *)) {
+  __bug_if_fail__(uninit_vec != NULL);
+  __bug_if_fail__(allocator.alloc != NULL);
+  __bug_if_fail__(allocator.release != NULL);
+  __bug_if_fail__(elem_size != 0);
+  __bug_if_fail__(len * elem_size <= capacity);
+
   __vector_set_capacity_internal(uninit_vec, capacity);
   __vector_set_length_internal(uninit_vec, len);
   __vector_set_ptr_internal(uninit_vec, ptr);
@@ -704,59 +961,99 @@ inline void vector_from_raw_parts(vector *uninit_vec,
   uninit_vec->_destructor = destructor;
 }
 
-/* Returns the position (element index) of an element given a pointer to it.
+/* Returns the offset of the element whose address is `element`,
+ * computed from pointer arithmetic against the buffer.
  *
- * Note: This is dangerous, as nothing checks that the pointer is
- * in fact pointing to an element in the internal buffer.
+ * Preconditions: `this` is a valid initialised vector and `element`
+ * points into the live portion of its buffer. There is no way to
+ * verify this from inside the function; mis-use produces meaningless
+ * results.
  */
-inline __attribute__((always_inline)) size_t
-vector_elem_get_offset(const vector *__this, const void *element) {
+__pure1 inline __attribute__((always_inline)) size_t
+vector_elem_get_offset(const vector *this, const void *element) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
   return (((const char *)element -
-           (const char *)vector_first_to_ptr_unchecked(__this)) /
-          vector_elem_size(__this));
+           (const char *)vector_first_to_ptr_unchecked(this)));
 }
 
-/* Returns a ointer to the first uninitialized element in the buffer.
- * This function essencially returns a pointer to the the position
- * `vector_length() + 1`.
- * Note: This is very dangerous as the caller must ensure that the
- * memory at this position is within the capacity.
- * This can be done with a call to `vector_uninitialized_length()`
+/* Returns the index of the element whose address is `element`,
+ * computed from pointer arithmetic against the buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector and `element`
+ * points into the live portion of its buffer. There is no way to
+ * verify this from inside the function; mis-use produces meaningless
+ * results.
  */
-inline __attribute__((always_inline)) void *
-vector_uninitialized_data(const vector *__this) {
-  return (vector_index_to_ptr_unchecked(__this, vector_length(__this)));
+__pure1 inline __attribute__((always_inline)) size_t
+vector_elem_get_index(const vector *this, const void *element) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
+  return (((const char *)element -
+           (const char *)vector_first_to_ptr_unchecked(this)) /
+          vector_elem_size(this));
 }
 
-/* Returns the number of elements that can fit in the buffer without
- * having to reallocate.
+/* Returns a pointer to the first byte past the live portion of the
+ * buffer (i.e. the slot at `length`). Intended for callers that
+ * intend to write a new element by hand and then call
+ * `vector_append_from_capacity`. The returned pointer is invalidated
+ * by any subsequent operation that may grow the buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector with at least
+ * one element of free capacity beyond `length`.
  */
-inline size_t vector_uninitialized_length(const vector *__this) {
-  size_t size_in_bytes = vector_capacity(__this) - vector_size_of(__this);
+__pure1 inline __attribute__((always_inline)) void *
+vector_uninitialized_data(const vector *this) {
+  __bug_if_fail__(this != NULL);
 
-  if (size_in_bytes) {
-    size_in_bytes /= vector_elem_size(__this);
+  return (vector_index_to_ptr_unchecked(this, vector_length(this)));
+}
+
+/* Returns the number of elements that can be appended before the
+ * buffer must be grown.
+ *
+ * Preconditions: `this` is a valid initialised vector.
+ */
+__pure1 inline size_t vector_uninitialized_length(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  size_t free_bytes;
+
+  free_bytes = vector_capacity(this) - vector_size_of(this);
+
+  if (free_bytes) {
+    free_bytes /= vector_elem_size(this);
   }
 
-  return (size_in_bytes);
+  return (free_bytes);
 }
 
-/* Returns the number of uninitialized bytes allocated. This is similar
- * to `vector_uninitialized_length` while returning the number of actual
- * bytes.
+/* Returns the number of free bytes beyond the live portion of the
+ * buffer.
+ *
+ * Preconditions: `this` is a valid initialised vector.
  */
-inline __attribute__((always_inline)) size_t
-vector_uninitialized_size_of(const vector *__this) {
-  return (vector_capacity(__this) - vector_size_of(__this));
+__pure1 inline __attribute__((always_inline)) size_t
+vector_uninitialized_size_of(const vector *this) {
+  __bug_if_fail__(this != NULL);
+
+  return (vector_capacity(this) - vector_size_of(this));
 }
 
-/* Appends `n` elements from capacity.
- * Note: This is very dangerous, the caller must ensure that the
- * uninitialized memory after `vector_length()` was manually initialized.
- * This function should only to be used with extra care in performance
- * critical context. This essencially only adds `n` to the vector length.
+/* Increments the visible length by `n`, claiming `n` previously
+ * unused slots as live elements. Intended for callers that have
+ * written those slots by hand through `vector_uninitialized_data`.
+ *
+ * Preconditions: `this` is a valid initialised vector, `n` slots
+ * beyond the current length have been initialised by the caller,
+ * and `length + n <= capacity / elem_size`.
  */
 inline __attribute__((always_inline)) void
-vector_append_from_capacity(vector *__this, size_t n) {
-  __this->_len += n;
+vector_append_from_capacity(vector *this, size_t n) {
+  __bug_if_fail__(this != NULL);
+
+  this->_len += n;
 }

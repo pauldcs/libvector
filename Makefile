@@ -1,4 +1,5 @@
 include libvector.mk
+include specs.mk
 
 SRCS_OBJS := $(patsubst %.c,$(OBJS_DIR)/%.o,$(SRCS))
 
@@ -24,6 +25,17 @@ $(NAME): $(SRCS_OBJS)
 g: CFLAGS = $(CFLAGS_DBG)
 g: all
 
+test: g
+	$(CC) \
+		$(TESTS_SRCS) \
+		$(SPECS_SRCS) \
+		$(CFLAGS_DBG) \
+		-I $(INCS_DIR) \
+		-I $(TESTS_INCS_DIR) \
+		-L. -lvector \
+		-o tester
+	./tester
+
 clean:
 	rm -rf $(OBJS_DIR)
 	rm -rf .cache
@@ -38,9 +50,10 @@ format:
 				-style=file -i {} \;
 
 fclean: clean
+	rm -rf $(TESTS_BIN)
 	rm -rf $(NAME)
 
 re: fclean all
 
-.PHONY	: all clean g fclean re format sparse
+.PHONY	: all test clean g fclean re format sparse
 
