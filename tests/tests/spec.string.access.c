@@ -1,5 +1,5 @@
-#include "vector.h"
 #include "unit_tests.h"
+#include "vector.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -14,84 +14,84 @@ static const vector_allocator_t k_alloc = {
 
 static bool __test_001__(void) {
   string s = {0};
-  (void)str_init(&s, k_alloc, 16);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"hello"));
-  unsigned char *p = str_index_to_ptr(&s, 1);
+  (void)string_init(&s, k_alloc, 16);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"hello"));
+  unsigned char *p = string_index_to_ptr(&s, 1);
   assert(p != NULL);
   ASSERT_NUM_EQUAL(*p, (unsigned char)'e', "%u");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
 static bool __test_002__(void) {
   string s = {0};
-  (void)str_init(&s, k_alloc, 16);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"abc"));
-  unsigned char *p = str_index_to_ptr(&s, (ssize_t)str_length(&s));
+  (void)string_init(&s, k_alloc, 16);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"abc"));
+  unsigned char *p = string_index_to_ptr(&s, (ssize_t)string_length(&s));
   assert(p != NULL);
   ASSERT_NUM_EQUAL(*p, (unsigned char)'\0', "%u");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
 static bool __test_003__(void) {
   string s = {0};
-  (void)str_init(&s, k_alloc, 16);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"abc"));
-  assert(str_index_to_ptr(&s, 99) == NULL);
-  str_deinit(&s);
+  (void)string_init(&s, k_alloc, 16);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"abc"));
+  assert(string_index_to_ptr(&s, 99) == NULL);
+  string_deinit(&s);
   return (true);
 }
 
 static bool __test_004__(void) {
   string s = {0};
-  (void)str_init(&s, k_alloc, 16);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"hello"));
-  unsigned char *p = str_index_to_ptr(&s, -1);
+  (void)string_init(&s, k_alloc, 16);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"hello"));
+  unsigned char *p = string_index_to_ptr(&s, -1);
   assert(p != NULL);
   ASSERT_NUM_EQUAL(*p, (unsigned char)'o', "%u");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
 static bool __test_005__(void) {
   string s = {0};
-  (void)str_init(&s, k_alloc, 16);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"hello"));
-  unsigned char *p = str_index_to_ptr(&s, -(ssize_t)str_length(&s));
+  (void)string_init(&s, k_alloc, 16);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"hello"));
+  unsigned char *p = string_index_to_ptr(&s, -(ssize_t)string_length(&s));
   assert(p != NULL);
   ASSERT_NUM_EQUAL(*p, (unsigned char)'h', "%u");
-  assert(str_index_to_ptr(&s, -(ssize_t)str_length(&s) - 1) == NULL);
-  str_deinit(&s);
+  assert(string_index_to_ptr(&s, -(ssize_t)string_length(&s) - 1) == NULL);
+  string_deinit(&s);
   return (true);
 }
 
 static bool __test_006__(void) {
   string s = {0};
-  (void)str_init(&s, k_alloc, 16);
-  unsigned char *p = str_index_to_ptr(&s, 0);
+  (void)string_init(&s, k_alloc, 16);
+  unsigned char *p = string_index_to_ptr(&s, 0);
   assert(p != NULL);
   ASSERT_NUM_EQUAL(*p, (unsigned char)'\0', "%u");
-  assert(str_index_to_ptr(&s, 1) == NULL);
-  assert(str_index_to_ptr(&s, -1) == NULL);
-  str_deinit(&s);
+  assert(string_index_to_ptr(&s, 1) == NULL);
+  assert(string_index_to_ptr(&s, -1) == NULL);
+  string_deinit(&s);
   return (true);
 }
 
 static bool __test_007__(void) {
   string s = {0};
-  (void)str_init(&s, k_alloc, 16);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"hello"));
-  unsigned char *p = str_index_to_ptr(&s, 0);
+  (void)string_init(&s, k_alloc, 16);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"hello"));
+  unsigned char *p = string_index_to_ptr(&s, 0);
   assert(p != NULL);
   *p = (unsigned char)'H';
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "Hello");
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)5, "%zu");
-  str_deinit(&s);
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)5, "%zu");
+  string_deinit(&s);
   return (true);
 }
 
-TEST_FUNCTION void str_access_specs(void) {
+TEST_FUNCTION void string_access_specs(void) {
   __test_start__;
   run_test(&__test_001__, "positive index returns the matching byte");
   run_test(&__test_002__, "position == length returns the trailing NUL");

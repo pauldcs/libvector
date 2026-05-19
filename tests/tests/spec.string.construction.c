@@ -14,13 +14,13 @@ static bool __test_001__(void) {
       .alloc = malloc,
       .release = free,
   };
-  (void)str_init(&s, allocator, 16);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"hello world"));
-  assert(str_clone(&s, &copy));
-  ASSERT_NUM_EQUAL(str_length(&copy), str_length(&s), "%zu");
+  (void)string_init(&s, allocator, 16);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"hello world"));
+  assert(string_clone(&s, &copy));
+  ASSERT_NUM_EQUAL(string_length(&copy), string_length(&s), "%zu");
   ASSERT_STR_EQUAL((char *)copy._vec._ptr, "hello world");
-  str_deinit(&s);
-  str_deinit(&copy);
+  string_deinit(&s);
+  string_deinit(&copy);
   return (true);
 }
 
@@ -31,13 +31,13 @@ static bool __test_002__(void) {
       .alloc = malloc,
       .release = free,
   };
-  (void)str_init(&s, allocator, 16);
-  assert(str_clone(&s, &copy));
-  ASSERT_NUM_EQUAL(str_length(&copy), (size_t)0, "%zu");
-  ASSERT_NUM_EQUAL(str_is_empty(&copy), true, "%d");
+  (void)string_init(&s, allocator, 16);
+  assert(string_clone(&s, &copy));
+  ASSERT_NUM_EQUAL(string_length(&copy), (size_t)0, "%zu");
+  ASSERT_NUM_EQUAL(string_is_empty(&copy), true, "%d");
   ASSERT_NUM_EQUAL(copy._vec._len, (size_t)1, "%zu");
-  str_deinit(&s);
-  str_deinit(&copy);
+  string_deinit(&s);
+  string_deinit(&copy);
   return (true);
 }
 
@@ -48,14 +48,14 @@ static bool __test_003__(void) {
       .alloc = malloc,
       .release = free,
   };
-  (void)str_init(&s, allocator, 16);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"original"));
-  assert(str_clone(&s, &copy));
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"-edited"));
+  (void)string_init(&s, allocator, 16);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"original"));
+  assert(string_clone(&s, &copy));
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"-edited"));
   ASSERT_STR_EQUAL((char *)copy._vec._ptr, "original");
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "original-edited");
-  str_deinit(&s);
-  str_deinit(&copy);
+  string_deinit(&s);
+  string_deinit(&copy);
   return (true);
 }
 
@@ -66,13 +66,13 @@ static bool __test_004__(void) {
       .alloc = malloc,
       .release = free,
   };
-  (void)str_init(&s, allocator, 32);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"hello world"));
-  assert(str_clone_slice(&s, &slice, 0, 5));
-  ASSERT_NUM_EQUAL(str_length(&slice), (size_t)5, "%zu");
+  (void)string_init(&s, allocator, 32);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"hello world"));
+  assert(string_clone_slice(&s, &slice, 0, 5));
+  ASSERT_NUM_EQUAL(string_length(&slice), (size_t)5, "%zu");
   ASSERT_STR_EQUAL((char *)slice._vec._ptr, "hello");
-  str_deinit(&s);
-  str_deinit(&slice);
+  string_deinit(&s);
+  string_deinit(&slice);
   return (true);
 }
 
@@ -83,13 +83,13 @@ static bool __test_005__(void) {
       .alloc = malloc,
       .release = free,
   };
-  (void)str_init(&s, allocator, 32);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"hello world"));
-  assert(str_clone_slice(&s, &slice, 6, 11));
-  ASSERT_NUM_EQUAL(str_length(&slice), (size_t)5, "%zu");
+  (void)string_init(&s, allocator, 32);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"hello world"));
+  assert(string_clone_slice(&s, &slice, 6, 11));
+  ASSERT_NUM_EQUAL(string_length(&slice), (size_t)5, "%zu");
   ASSERT_STR_EQUAL((char *)slice._vec._ptr, "world");
-  str_deinit(&s);
-  str_deinit(&slice);
+  string_deinit(&s);
+  string_deinit(&slice);
   return (true);
 }
 
@@ -100,15 +100,15 @@ static bool __test_006__(void) {
       .alloc = malloc,
       .release = free,
   };
-  (void)str_init(&s, allocator, 32);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"hello world"));
-  assert(str_clone_slice(&s, &slice, -5, 11));
+  (void)string_init(&s, allocator, 32);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"hello world"));
+  assert(string_clone_slice(&s, &slice, -5, 11));
   ASSERT_STR_EQUAL((char *)slice._vec._ptr, "world");
-  str_deinit(&slice);
-  assert(str_clone_slice(&s, &slice, 0, -6));
+  string_deinit(&slice);
+  assert(string_clone_slice(&s, &slice, 0, -6));
   ASSERT_STR_EQUAL((char *)slice._vec._ptr, "hello");
-  str_deinit(&s);
-  str_deinit(&slice);
+  string_deinit(&s);
+  string_deinit(&slice);
   return (true);
 }
 
@@ -119,14 +119,14 @@ static bool __test_007__(void) {
       .alloc = malloc,
       .release = free,
   };
-  (void)str_init(&s, allocator, 32);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"hi"));
-  assert(str_clone_slice(&s, &slice, 5, 10));
-  ASSERT_NUM_EQUAL(str_length(&slice), (size_t)0, "%zu");
-  ASSERT_NUM_EQUAL(str_is_empty(&slice), true, "%d");
+  (void)string_init(&s, allocator, 32);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"hi"));
+  assert(string_clone_slice(&s, &slice, 5, 10));
+  ASSERT_NUM_EQUAL(string_length(&slice), (size_t)0, "%zu");
+  ASSERT_NUM_EQUAL(string_is_empty(&slice), true, "%d");
   ASSERT_NUM_EQUAL(slice._vec._len, (size_t)1, "%zu");
-  str_deinit(&s);
-  str_deinit(&slice);
+  string_deinit(&s);
+  string_deinit(&slice);
   return (true);
 }
 
@@ -137,13 +137,13 @@ static bool __test_008__(void) {
       .alloc = malloc,
       .release = free,
   };
-  (void)str_init(&s, allocator, 32);
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"abcdefg"));
-  assert(str_clone_slice(&s, &slice, 5, 2));
-  ASSERT_NUM_EQUAL(str_length(&slice), (size_t)0, "%zu");
+  (void)string_init(&s, allocator, 32);
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"abcdefg"));
+  assert(string_clone_slice(&s, &slice, 5, 2));
+  ASSERT_NUM_EQUAL(string_length(&slice), (size_t)0, "%zu");
   ASSERT_NUM_EQUAL(slice._vec._len, (size_t)1, "%zu");
-  str_deinit(&s);
-  str_deinit(&slice);
+  string_deinit(&s);
+  string_deinit(&slice);
   return (true);
 }
 
@@ -153,11 +153,11 @@ static bool __test_009__(void) {
       .alloc = malloc,
       .release = free,
   };
-  assert(str_from_cstr(&s, allocator, 1000,
-                       (const unsigned char *)"from cstring"));
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)12, "%zu");
+  assert(string_from_cstr(&s, allocator, 1000,
+                          (const unsigned char *)"from cstring"));
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)12, "%zu");
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "from cstring");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
@@ -167,11 +167,11 @@ static bool __test_010__(void) {
       .alloc = malloc,
       .release = free,
   };
-  assert(str_from_cstr(&s, allocator, 5,
-                       (const unsigned char *)"truncate me please"));
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)5, "%zu");
+  assert(string_from_cstr(&s, allocator, 5,
+                          (const unsigned char *)"truncate me please"));
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)5, "%zu");
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "trunc");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
@@ -181,11 +181,11 @@ static bool __test_011__(void) {
       .alloc = malloc,
       .release = free,
   };
-  assert(str_from_cstr(&s, allocator, 1000, NULL));
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)0, "%zu");
-  ASSERT_NUM_EQUAL(str_is_empty(&s), true, "%d");
+  assert(string_from_cstr(&s, allocator, 1000, NULL));
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)0, "%zu");
+  ASSERT_NUM_EQUAL(string_is_empty(&s), true, "%d");
   ASSERT_NUM_EQUAL(s._vec._len, (size_t)1, "%zu");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
@@ -195,11 +195,11 @@ static bool __test_012__(void) {
       .alloc = malloc,
       .release = free,
   };
-  assert(str_from_cstr(&s, allocator, 1000, (const unsigned char *)""));
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)0, "%zu");
+  assert(string_from_cstr(&s, allocator, 1000, (const unsigned char *)""));
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)0, "%zu");
   ASSERT_NUM_EQUAL(s._vec._len, (size_t)1, "%zu");
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
@@ -209,10 +209,10 @@ static bool __test_013__(void) {
       .alloc = malloc,
       .release = free,
   };
-  assert(str_from_format(&s, allocator, 1000, "%d + %d = %d", 2, 3, 5));
+  assert(string_from_format(&s, allocator, 1000, "%d + %d = %d", 2, 3, 5));
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "2 + 3 = 5");
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)9, "%zu");
-  str_deinit(&s);
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)9, "%zu");
+  string_deinit(&s);
   return (true);
 }
 
@@ -222,11 +222,11 @@ static bool __test_014__(void) {
       .alloc = malloc,
       .release = free,
   };
-  assert(str_from_format(&s, allocator, 1000, "%s/%s/%s", "path", "to",
-                         "file.txt"));
+  assert(string_from_format(&s, allocator, 1000, "%s/%s/%s", "path", "to",
+                            "file.txt"));
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "path/to/file.txt");
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)16, "%zu");
-  str_deinit(&s);
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)16, "%zu");
+  string_deinit(&s);
   return (true);
 }
 
@@ -236,10 +236,10 @@ static bool __test_015__(void) {
       .alloc = malloc,
       .release = free,
   };
-  assert(str_from_format(&s, allocator, 5, "Hello, World"));
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)5, "%zu");
+  assert(string_from_format(&s, allocator, 5, "Hello, World"));
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)5, "%zu");
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "Hello");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
@@ -249,11 +249,11 @@ static bool __test_016__(void) {
       .alloc = malloc,
       .release = free,
   };
-  assert(str_from_format(&s, allocator, 1000, ""));
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)0, "%zu");
+  assert(string_from_format(&s, allocator, 1000, ""));
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)0, "%zu");
   ASSERT_NUM_EQUAL(s._vec._len, (size_t)1, "%zu");
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
@@ -267,11 +267,11 @@ static bool __test_017__(void) {
   assert(buf != NULL);
   memcpy(buf, "raw parts", 9);
   buf[9] = '\0';
-  str_from_raw_parts(&s, allocator, buf, 9, 32);
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)9, "%zu");
+  string_from_raw_parts(&s, allocator, buf, 9, 32);
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)9, "%zu");
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "raw parts");
   ASSERT_NUM_EQUAL(s._vec._len, (size_t)10, "%zu");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
@@ -284,17 +284,17 @@ static bool __test_018__(void) {
   unsigned char *buf = malloc(16);
   assert(buf != NULL);
   buf[0] = '\0';
-  str_from_raw_parts(&s, allocator, buf, 0, 16);
-  ASSERT_NUM_EQUAL(str_length(&s), (size_t)0, "%zu");
+  string_from_raw_parts(&s, allocator, buf, 0, 16);
+  ASSERT_NUM_EQUAL(string_length(&s), (size_t)0, "%zu");
   ASSERT_NUM_EQUAL(s._vec._len, (size_t)1, "%zu");
-  ASSERT_NUM_EQUAL(str_is_empty(&s), true, "%d");
-  assert(str_push_cstr(&s, 1000, (const unsigned char *)"added"));
+  ASSERT_NUM_EQUAL(string_is_empty(&s), true, "%d");
+  assert(string_push_cstr(&s, 1000, (const unsigned char *)"added"));
   ASSERT_STR_EQUAL((char *)s._vec._ptr, "added");
-  str_deinit(&s);
+  string_deinit(&s);
   return (true);
 }
 
-TEST_FUNCTION void str_construction_specs(void) {
+TEST_FUNCTION void string_construction_specs(void) {
   __test_start__;
   run_test(&__test_001__, "clone deep-copies content");
   run_test(&__test_002__, "clone of empty string");

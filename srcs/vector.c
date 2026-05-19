@@ -1,4 +1,18 @@
 #include "vector.h"
+#include <stdlib.h>
+
+/* `malloc` used internally with `vector_from_raw_parts_static`.
+ *
+ * This will always fail, as a static buffer is not supposed to grow.
+ */
+void *__static_noop_malloc(size_t __size) {
+  (void)__size;
+  return (false);
+}
+
+/* `free` used internally with `vector_from_raw_parts_static`.
+ */
+void __static_noop_free(void *__ptr) { (void)__ptr; }
 
 /* Sets the vector's stored length without touching the underlying buffer.
  *
@@ -482,6 +496,27 @@ __no_discard inline bool vector_push(vector *this, const void *element) {
   return (true);
 }
 
+/* Appends one element to the end of the vector, copying `elem_size`
+ * bytes from `element` into the buffer. Grows the buffer if needed.
+ *
+ * Preconditions: `this` is a valid initialised vector and `element`
+ * points to at least `elem_size` readable bytes that do not overlap
+ * the vector's buffer.
+ *
+ * # WARNING
+ * this cannot fail and will abort in case of OOM or overflow
+ */
+inline void vector_push_infaillible(vector *this, const void *element) {
+  __bug_if_fail__(this != NULL);
+  __bug_if_fail__(element != NULL);
+
+  if (unlikely(!vector_adjust_cap_if_full(this, 1))) {
+    abort();
+  }
+
+  vector_push_within_inner_unchecked(this, element);
+}
+
 /* Appends one element to the end of the vector without growing the
  * buffer. Returns false if the buffer is already full, in which case
  * any existing pointers into the buffer remain valid.
@@ -936,11 +971,11 @@ __no_discard inline bool vector_shrink_to_fit(vector *this) {
 
 /* Constructs a vector directly from caller-owned components without
  * computing or validating anything. Intended for transferring an
- * existing buffer into the vector model; the caller is responsible
+ * existing buffer into the vector model. The caller is responsible
  * for the consistency of every argument.
  *
  * Preconditions: `uninit_vec` points to writable storage; `ptr` was
- * obtained from `allocator`; `capacity` is the allocation size in
+ * obtained from `allocator`. `capacity` is the allocation size in
  * bytes; `len * elem_size <= capacity`.
  */
 inline void vector_from_raw_parts(vector *uninit_vec,
@@ -952,6 +987,41 @@ inline void vector_from_raw_parts(vector *uninit_vec,
   __bug_if_fail__(allocator.release != NULL);
   __bug_if_fail__(elem_size != 0);
   __bug_if_fail__(len * elem_size <= capacity);
+
+  __vector_set_capacity_internal(uninit_vec, capacity);
+  __vector_set_length_internal(uninit_vec, len);
+  __vector_set_ptr_internal(uninit_vec, ptr);
+  __vector_set_elem_size_internal(uninit_vec, elem_size);
+  uninit_vec->_allocator = allocator;
+  uninit_vec->_destructor = destructor;
+}
+
+/* Constructs a static vector directly from caller owned components without
+ * computing or validating anything. Intended for transferring an
+ * existing static buffer into the vector model. The caller is responsible
+ * for the consistency of every argument.
+ *
+ * Preconditions: `uninit_vec` points to writable storage. `ptr` is a buffer
+ * containing at least `capacity` bytes. `len * elem_size <= capacity`.
+ *
+ * # IMPORTANT:
+ * this vector constructor is intended to be used with static buffers that
+ * cannot grow, thus, every pointer within it are stable across the lifetime of
+ * the vector. It does not have an allocator, any method that attempts to grow
+ * it will fail. It is advised to only use `*within_inner` methods.
+ */
+inline void vector_from_raw_static_parts(vector *uninit_vec, void *ptr,
+                                         size_t elem_size, size_t len,
+                                         size_t capacity,
+                                         void (*destructor)(void *)) {
+  __bug_if_fail__(uninit_vec != NULL);
+  __bug_if_fail__(elem_size != 0);
+  __bug_if_fail__(len * elem_size <= capacity);
+
+  vector_allocator_t allocator = {
+      .alloc = __static_noop_malloc,
+      .release = __static_noop_free,
+  };
 
   __vector_set_capacity_internal(uninit_vec, capacity);
   __vector_set_length_internal(uninit_vec, len);

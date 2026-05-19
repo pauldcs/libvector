@@ -29,6 +29,9 @@ CFLAGS_DBG := \
 -fsanitize=address          \
 -fsanitize=undefined        \
 -fno-omit-frame-pointer     \
+-fstack-protector           \
+-fstack-protector-strong    \
+-fstack-check               \
 -fno-optimize-sibling-calls \
 -D DEBUG=1
 

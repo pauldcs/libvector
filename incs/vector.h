@@ -106,6 +106,7 @@ void vector_deinit_zeroized(vector *this);
 bool vector_adjust_cap_if_full(vector *this, size_t n);
 bool vector_adjust_exact_cap_if_full(vector *this, size_t n);
 bool vector_push(vector *this, const void *element);
+void vector_push_infaillible(vector *this, const void *element);
 bool vector_push_within_inner(vector *this, const void *element);
 void vector_push_within_inner_unchecked(vector *this, const void *element);
 void vector_pop(vector *this);
@@ -139,6 +140,9 @@ bool vector_shrink_to_fit(vector *this);
 void vector_from_raw_parts(vector *uninit_vec, vector_allocator_t allocator,
                            void *ptr, size_t elem_size, size_t len,
                            size_t capacity, void (*destructor)(void *));
+void vector_from_raw_static_parts(vector *uninit_vec, void *ptr,
+                                  size_t elem_size, size_t len, size_t capacity,
+                                  void (*destructor)(void *));
 size_t vector_elem_get_offset(const vector *this, const void *element);
 size_t vector_elem_get_index(const vector *this, const void *element);
 void *vector_uninitialized_data(const vector *this);
@@ -153,39 +157,42 @@ typedef struct string {
   vector _vec;
 } string;
 
-bool str_init(string *str_uninit, vector_allocator_t allocator,
-              size_t init_cap);
-bool str_clone(const string *this, string *str_uninit);
-bool str_clone_slice(const string *this, string *str_uninit, int64_t start,
-                     int64_t end);
-bool str_from_cstr(string *str_uninit, vector_allocator_t allocator,
-                   size_t max_len, const unsigned char *cstr);
-void str_from_raw_parts(string *str_uninit, vector_allocator_t allocator,
-                        unsigned char *buf, size_t len, size_t capacity);
-bool str_from_format(string *str_uninit, vector_allocator_t allocator,
-                     size_t max_len, const char *format, ...);
-void str_deinit(string *this);
-size_t str_length(const string *this);
-bool str_is_empty(const string *this);
-void str_clear(string *this);
-unsigned char *str_index_to_ptr(const string *this, ssize_t position);
-bool str_push_char(string *this, unsigned char byte);
-bool str_push_cstr(string *this, size_t max_len, const unsigned char *cstr);
-bool str_append(string *this, const string *other);
-bool str_append_format(string *this, size_t max_len, const char *format, ...);
-int str_pop_char(string *this);
-bool str_pushf_char(string *this, unsigned char byte);
-int str_popf_char(string *this);
-bool str_insert_char(string *this, size_t position, unsigned char byte);
-bool str_insert_cstr(string *this, size_t position, size_t max_len,
-                     const unsigned char *cstr);
-bool str_insert_other(string *this, size_t position, const string *other);
-bool str_insert_format(string *this, size_t position, size_t max_len,
-                       const char *format, ...);
-void str_remove(string *this, size_t position);
-void str_remove_range(string *this, size_t start, size_t end);
-void str_truncate(string *this, size_t len);
-bool str_shrink_to_fit(string *this);
-void str_leak_cstr(string *this, unsigned char **out_buf);
+bool string_init(string *string_uninit, vector_allocator_t allocator,
+                 size_t init_cap);
+bool string_clone(const string *this, string *string_uninit);
+bool string_clone_slice(const string *this, string *string_uninit,
+                        int64_t start, int64_t end);
+bool string_from_cstr(string *string_uninit, vector_allocator_t allocator,
+                      size_t max_len, const unsigned char *cstr);
+void string_from_raw_parts(string *string_uninit, vector_allocator_t allocator,
+                           unsigned char *buf, size_t len, size_t capacity);
+void string_from_raw_static_parts(string *string_uninit, unsigned char *buf,
+                                  size_t len, size_t capacity);
+bool string_from_format(string *string_uninit, vector_allocator_t allocator,
+                        size_t max_len, const char *format, ...);
+void string_deinit(string *this);
+size_t string_length(const string *this);
+bool string_is_empty(const string *this);
+void string_clear(string *this);
+unsigned char *string_index_to_ptr(const string *this, ssize_t position);
+bool string_push_char(string *this, unsigned char byte);
+bool string_push_cstr(string *this, size_t max_len, const unsigned char *cstr);
+bool string_append(string *this, const string *other);
+bool string_append_format(string *this, size_t max_len, const char *format,
+                          ...);
+int string_pop_char(string *this);
+bool string_pushf_char(string *this, unsigned char byte);
+int string_popf_char(string *this);
+bool string_insert_char(string *this, size_t position, unsigned char byte);
+bool string_insert_cstr(string *this, size_t position, size_t max_len,
+                        const unsigned char *cstr);
+bool string_insert_other(string *this, size_t position, const string *other);
+bool string_insert_format(string *this, size_t position, size_t max_len,
+                          const char *format, ...);
+void string_remove(string *this, size_t position);
+void string_remove_range(string *this, size_t start, size_t end);
+void string_truncate(string *this, size_t len);
+bool string_shrink_to_fit(string *this);
+void string_leak_cstr(string *this, unsigned char **out_buf);
 
 #endif /* __VECTOR_H__ */

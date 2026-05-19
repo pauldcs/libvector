@@ -21,10 +21,10 @@
  * `format` is a valid printf-style format string, `args` is a valid
  * va_list matching `format`, and `out_written` is non-NULL.
  */
-__no_discard static inline bool __str_vsnprintf(char *dst, size_t dst_size,
-                                                const char *format,
-                                                va_list args,
-                                                size_t *out_written) {
+__no_discard static inline bool __string_vsnprintf(char *dst, size_t dst_size,
+                                                   const char *format,
+                                                   va_list args,
+                                                   size_t *out_written) {
   __bug_if_fail__(dst != NULL || dst_size == 0);
   __bug_if_fail__(format != NULL);
   __bug_if_fail__(out_written != NULL);
@@ -48,8 +48,8 @@ __no_discard static inline bool __str_vsnprintf(char *dst, size_t dst_size,
  * Returns: true on success and writes the new buffer to `*out`. On
  * failure `*out` is unspecified.
  */
-__no_discard static inline bool __str_alloc(string *this, size_t n,
-                                            unsigned char **out) {
+__no_discard static inline bool __string_alloc(string *this, size_t n,
+                                               unsigned char **out) {
   __bug_if_fail__(this != NULL);
   __bug_if_fail__(out != NULL);
 
@@ -66,7 +66,7 @@ __no_discard static inline bool __str_alloc(string *this, size_t n,
  * Preconditions: `this` is a valid initialised string.
  */
 __pure1 static inline __attribute__((always_inline)) unsigned char *
-__str_ptr(const string *this) {
+__string_ptr(const string *this) {
   __bug_if_fail__(this != NULL);
 
   return ((unsigned char *)vector_first_to_ptr_unchecked(&this->_vec));
@@ -79,7 +79,7 @@ __str_ptr(const string *this) {
  * Preconditions: `this` is a valid initialised string.
  */
 __pure1 static inline __attribute__((always_inline)) size_t
-__str_len(const string *this) {
+__string_len(const string *this) {
   __bug_if_fail__(this != NULL);
   __bug_if_fail__(vector_length(&this->_vec) >= 1);
 
@@ -93,7 +93,7 @@ __str_len(const string *this) {
  * Preconditions: `bytes` is readable for at least `max` bytes.
  */
 __pure1 static inline __attribute__((always_inline)) size_t
-__str_strnlen(const unsigned char *bytes, size_t max) {
+__string_strnlen(const unsigned char *bytes, size_t max) {
   __bug_if_fail__(bytes != NULL || max == 0);
 
   size_t i;
@@ -113,7 +113,7 @@ __str_strnlen(const unsigned char *bytes, size_t max) {
  * `size_t`. On overflow `*out` is unspecified and false is returned.
  */
 __no_discard static inline __attribute__((always_inline)) bool
-__str_add_size(size_t left, size_t right, size_t *out) {
+__string_add_size(size_t left, size_t right, size_t *out) {
   __bug_if_fail__(out != NULL);
 
   if (unlikely(left > SIZE_MAX - right)) {
@@ -132,7 +132,7 @@ __str_add_size(size_t left, size_t right, size_t *out) {
  * Returns: true on success. On failure the buffer is unchanged.
  */
 __no_discard inline __attribute__((always_inline)) bool
-__str_reserve(string *this, size_t n) {
+__string_reserve(string *this, size_t n) {
   __bug_if_fail__(this != NULL);
 
   return (vector_adjust_cap_if_full(&this->_vec, n));
@@ -147,7 +147,7 @@ __str_reserve(string *this, size_t n) {
  * Preconditions: none.
  */
 __pure1 static inline __attribute__((always_inline)) size_t
-__str_clamp_index(ssize_t idx, size_t len) {
+__string_clamp_index(ssize_t idx, size_t len) {
   ssize_t signed_len;
 
   signed_len = (ssize_t)len;
@@ -173,7 +173,7 @@ __str_clamp_index(ssize_t idx, size_t len) {
  * Returns: true on success. On failure no buffer has been allocated.
  */
 __no_discard static inline __attribute__((always_inline)) bool
-__str_init(string *this, vector_allocator_t allocator, size_t init_cap) {
+__string_init(string *this, vector_allocator_t allocator, size_t init_cap) {
   __bug_if_fail__(this != NULL);
 
   const unsigned char nul = '\0';
@@ -201,10 +201,10 @@ __str_init(string *this, vector_allocator_t allocator, size_t init_cap) {
  * Returns: true on success and writes the (possibly clamped) byte
  * count to `*out_want`. On encoding error `*out_want` is unspecified.
  */
-__no_discard static inline bool __str_format_probe(size_t max_len,
-                                                   const char *format,
-                                                   va_list args,
-                                                   size_t *out_want) {
+__no_discard static inline bool __string_format_probe(size_t max_len,
+                                                      const char *format,
+                                                      va_list args,
+                                                      size_t *out_want) {
   __bug_if_fail__(format != NULL);
   __bug_if_fail__(out_want != NULL);
 
@@ -213,7 +213,7 @@ __no_discard static inline bool __str_format_probe(size_t max_len,
   bool ok;
 
   va_copy(probe, args);
-  ok = __str_vsnprintf(NULL, 0, format, probe, &want);
+  ok = __string_vsnprintf(NULL, 0, format, probe, &want);
   va_end(probe);
 
   if (unlikely(!ok)) {
@@ -238,11 +238,11 @@ __no_discard static inline bool __str_format_probe(size_t max_len,
  * `position` is in [0, length].
  */
 static inline __attribute__((always_inline)) void
-__str_insert_bytes_unchecked(string *this, size_t position, const void *src,
-                             size_t n) {
+__string_insert_bytes_unchecked(string *this, size_t position, const void *src,
+                                size_t n) {
   __bug_if_fail__(this != NULL);
   __bug_if_fail__(src != NULL || n == 0);
-  __bug_if_fail__(position <= __str_len(this));
+  __bug_if_fail__(position <= __string_len(this));
 
   vector_copy_contiguous_within_inner_unchecked(&this->_vec, position, src, n);
 }
@@ -256,9 +256,9 @@ __str_insert_bytes_unchecked(string *this, size_t position, const void *src,
  * `start + n <= length`.
  */
 static inline __attribute__((always_inline)) void
-__str_remove_bytes_unchecked(string *this, size_t start, size_t n) {
+__string_remove_bytes_unchecked(string *this, size_t start, size_t n) {
   __bug_if_fail__(this != NULL);
-  __bug_if_fail__(start + n <= __str_len(this));
+  __bug_if_fail__(start + n <= __string_len(this));
 
   vector_leak_range_unchecked(&this->_vec, start, n);
 }
@@ -267,183 +267,211 @@ __str_remove_bytes_unchecked(string *this, size_t start, size_t n) {
  * is a byte capacity hint; 0 falls back to the underlying container's
  * default.
  *
- * Preconditions: `str_uninit` points to writable storage of at least
+ * Preconditions: `string_uninit` points to writable storage of at least
  * `sizeof(string)` bytes and `allocator` is a valid allocator pair.
  *
  * On success the string is empty, NUL-terminated, and ready for use.
  * On failure no buffer has been allocated and the caller has no
  * cleanup to perform.
  */
-__no_discard bool str_init(string *str_uninit, vector_allocator_t allocator,
-                           size_t init_cap) {
-  __bug_if_fail__(str_uninit != NULL);
+__no_discard bool string_init(string *string_uninit,
+                              vector_allocator_t allocator, size_t init_cap) {
+  __bug_if_fail__(string_uninit != NULL);
   __bug_if_fail__(allocator.alloc != NULL);
   __bug_if_fail__(allocator.release != NULL);
 
-  return (__str_init(str_uninit, allocator, init_cap));
+  return (__string_init(string_uninit, allocator, init_cap));
 }
 
-/* Initialises `str_uninit` as a deep copy of `this`. The new string
+/* Initialises `string_uninit` as a deep copy of `this`. The new string
  * uses the source's allocator and mirrors its capacity.
  *
  * Preconditions: `this` is a valid initialised string and
- * `str_uninit` points to writable storage of at least `sizeof(string)`
+ * `string_uninit` points to writable storage of at least `sizeof(string)`
  * bytes.
  * Returns: true on success. On failure no buffer has been allocated
  * and the caller has no cleanup to perform.
  */
-__no_discard bool str_clone(const string *this, string *str_uninit) {
+__no_discard bool string_clone(const string *this, string *string_uninit) {
   __bug_if_fail__(this != NULL);
-  __bug_if_fail__(str_uninit != NULL);
+  __bug_if_fail__(string_uninit != NULL);
 
   const size_t src_cap = vector_capacity(&this->_vec);
-  const size_t src_len = __str_len(this);
+  const size_t src_len = __string_len(this);
 
-  if (unlikely(!__str_init(str_uninit, this->_vec._allocator, src_cap))) {
+  if (unlikely(!__string_init(string_uninit, this->_vec._allocator, src_cap))) {
     return (false);
   }
 
   if (src_len > 0) {
-    if (unlikely(!__str_reserve(str_uninit, src_len))) {
-      str_deinit(str_uninit);
+    if (unlikely(!__string_reserve(string_uninit, src_len))) {
+      string_deinit(string_uninit);
       return (false);
     }
-    __str_insert_bytes_unchecked(str_uninit, 0, __str_ptr(this), src_len);
+    __string_insert_bytes_unchecked(string_uninit, 0, __string_ptr(this),
+                                    src_len);
   }
 
   return (true);
 }
 
-/* Initialises `str_uninit` as a deep copy of the half-open slice
+/* Initialises `string_uninit` as a deep copy of the half-open slice
  * `[start, end)` of `this`. Negative indices are interpreted as
  * offsets from the end. Out-of-range inputs are clamped to the
  * string's bounds, and an empty or inverted slice produces an empty
  * result.
  *
  * Preconditions: `this` is a valid initialised string and
- * `str_uninit` points to writable storage of at least
+ * `string_uninit` points to writable storage of at least
  * `sizeof(string)` bytes.
  * Returns: true on success. On failure no buffer has been allocated
  * and the caller has no cleanup to perform.
  */
-__no_discard bool str_clone_slice(const string *this, string *str_uninit,
-                                  int64_t start, int64_t end) {
+__no_discard bool string_clone_slice(const string *this, string *string_uninit,
+                                     int64_t start, int64_t end) {
   __bug_if_fail__(this != NULL);
-  __bug_if_fail__(str_uninit != NULL);
+  __bug_if_fail__(string_uninit != NULL);
 
-  const size_t len = __str_len(this);
+  const size_t len = __string_len(this);
   size_t start_clamped;
   size_t end_clamped;
   size_t n;
   size_t cap_hint;
 
-  start_clamped = __str_clamp_index((ssize_t)start, len);
-  end_clamped = __str_clamp_index((ssize_t)end, len);
+  start_clamped = __string_clamp_index((ssize_t)start, len);
+  end_clamped = __string_clamp_index((ssize_t)end, len);
   if (end_clamped < start_clamped) {
     end_clamped = start_clamped;
   }
 
   n = end_clamped - start_clamped;
 
-  if (unlikely(!__str_add_size(n, 1, &cap_hint))) {
+  if (unlikely(!__string_add_size(n, 1, &cap_hint))) {
     return (false);
   }
 
-  if (unlikely(!__str_init(str_uninit, this->_vec._allocator, cap_hint))) {
+  if (unlikely(
+          !__string_init(string_uninit, this->_vec._allocator, cap_hint))) {
     return (false);
   }
 
   if (n > 0) {
-    if (unlikely(!__str_reserve(str_uninit, n))) {
-      str_deinit(str_uninit);
+    if (unlikely(!__string_reserve(string_uninit, n))) {
+      string_deinit(string_uninit);
       return (false);
     }
-    __str_insert_bytes_unchecked(str_uninit, 0, __str_ptr(this) + start_clamped,
-                                 n);
+    __string_insert_bytes_unchecked(string_uninit, 0,
+                                    __string_ptr(this) + start_clamped, n);
   }
 
   return (true);
 }
 
-/* Initialises `str_uninit` with a copy of up to `max_len` bytes
+/* Initialises `string_uninit` with a copy of up to `max_len` bytes
  * read from `cstr`. The read is bounded: this function never
  * inspects past `max_len`, even if `cstr` is not NUL-terminated
  * within that window. Truncation is silent.
  *
- * Preconditions: `str_uninit` points to writable storage of at least
+ * Preconditions: `string_uninit` points to writable storage of at least
  * `sizeof(string)` bytes, `allocator` is a valid allocator pair, and
  * either `cstr` is readable for at least `max_len` bytes or `cstr`
  * is NULL (treated as an empty input).
  * Returns: true on success. On failure no buffer has been allocated
  * and the caller has no cleanup to perform.
  */
-__no_discard bool str_from_cstr(string *str_uninit,
-                                vector_allocator_t allocator, size_t max_len,
-                                const unsigned char *cstr) {
-  __bug_if_fail__(str_uninit != NULL);
+__no_discard bool string_from_cstr(string *string_uninit,
+                                   vector_allocator_t allocator, size_t max_len,
+                                   const unsigned char *cstr) {
+  __bug_if_fail__(string_uninit != NULL);
   __bug_if_fail__(allocator.alloc != NULL);
   __bug_if_fail__(allocator.release != NULL);
 
   size_t n;
   size_t cap_hint;
 
-  n = (cstr == NULL) ? 0 : __str_strnlen(cstr, max_len);
+  n = (cstr == NULL) ? 0 : __string_strnlen(cstr, max_len);
 
-  if (unlikely(!__str_add_size(n, 1, &cap_hint))) {
+  if (unlikely(!__string_add_size(n, 1, &cap_hint))) {
     return (false);
   }
 
-  if (unlikely(!__str_init(str_uninit, allocator, cap_hint))) {
+  if (unlikely(!__string_init(string_uninit, allocator, cap_hint))) {
     return (false);
   }
 
   if (n > 0) {
-    if (unlikely(!__str_reserve(str_uninit, n))) {
-      str_deinit(str_uninit);
+    if (unlikely(!__string_reserve(string_uninit, n))) {
+      string_deinit(string_uninit);
       return (false);
     }
-    __str_insert_bytes_unchecked(str_uninit, 0, cstr, n);
+    __string_insert_bytes_unchecked(string_uninit, 0, cstr, n);
   }
 
   return (true);
 }
 
-/* Adopts an existing buffer as the storage of `str_uninit`. No copy
+/* Adopts an existing buffer as the storage of `string_uninit`. No copy
  * is made; the string takes ownership of `buf`. The buffer must
  * already contain a NUL at `buf[len]`, which becomes the string's
  * trailing NUL inside the underlying vector.
  *
- * Preconditions: `str_uninit` points to writable storage of at least
+ * Preconditions: `string_uninit` points to writable storage of at least
  * `sizeof(string)` bytes, `buf` was allocated by `allocator`,
  * `capacity` is the size of that allocation in bytes, `len + 1 <=
  * capacity`, and `buf[len] == '\0'`.
  */
-void str_from_raw_parts(string *str_uninit, vector_allocator_t allocator,
-                        unsigned char *buf, size_t len, size_t capacity) {
-  __bug_if_fail__(str_uninit != NULL);
+void string_from_raw_parts(string *string_uninit, vector_allocator_t allocator,
+                           unsigned char *buf, size_t len, size_t capacity) {
+  __bug_if_fail__(string_uninit != NULL);
   __bug_if_fail__(buf != NULL);
   __bug_if_fail__(allocator.alloc != NULL);
   __bug_if_fail__(allocator.release != NULL);
   __bug_if_fail__(len + 1 <= capacity);
   __bug_if_fail__(buf[len] == '\0');
 
-  vector_from_raw_parts(&str_uninit->_vec, allocator, buf,
+  vector_from_raw_parts(&string_uninit->_vec, allocator, buf,
                         sizeof(unsigned char), len + 1, capacity, NULL);
 }
 
-/* Initialises `str_uninit` with the rendering of a printf-style
+/* Adopts an existing buffer as the storage of `string_uninit`. No copy
+ * is made, the string takes ownership of `buf`. The buffer must
+ * already contain a NUL at `buf[len]`, which becomes the string's
+ * trailing NUL inside the underlying vector.
+ *
+ * Preconditions: `string_uninit` points to writable storage of at least
+ * `sizeof(string)` bytes, `capacity` is the size of the static string,
+ * `len + 1 <= capacity`, and `buf[len] == '\0'`.
+ *
+ * # IMPORTANT:
+ * this string constructor is intended to be used with static string that
+ * cannot grow, thus, every pointer within it are stable across the lifetime of
+ * the string. It does not have an allocator, any method that attempts to grow
+ * it will fail. It is advised to only use `*within_inner` methods.
+ */
+void string_from_raw_static_parts(string *string_uninit, unsigned char *buf,
+                                  size_t len, size_t capacity) {
+  __bug_if_fail__(string_uninit != NULL);
+  __bug_if_fail__(buf != NULL);
+  __bug_if_fail__(len + 1 <= capacity);
+  __bug_if_fail__(buf[len] == '\0');
+
+  vector_from_raw_static_parts(&string_uninit->_vec, buf, sizeof(unsigned char),
+                               len + 1, capacity, NULL);
+}
+
+/* Initialises `string_uninit` with the rendering of a printf-style
  * format, truncated to at most `max_len` bytes (NUL excluded).
  *
- * Preconditions: `str_uninit` points to writable storage of at least
+ * Preconditions: `string_uninit` points to writable storage of at least
  * `sizeof(string)` bytes, `allocator` is a valid allocator pair, and
  * `format` is a valid format string with arguments to match.
  * Returns: true on success. On failure no buffer has been allocated
  * and the caller has no cleanup to perform.
  */
-__no_discard bool str_from_format(string *str_uninit,
-                                  vector_allocator_t allocator, size_t max_len,
-                                  const char *format, ...) {
-  __bug_if_fail__(str_uninit != NULL);
+__no_discard bool string_from_format(string *string_uninit,
+                                     vector_allocator_t allocator,
+                                     size_t max_len, const char *format, ...) {
+  __bug_if_fail__(string_uninit != NULL);
   __bug_if_fail__(allocator.alloc != NULL);
   __bug_if_fail__(allocator.release != NULL);
   __bug_if_fail__(format != NULL);
@@ -455,23 +483,23 @@ __no_discard bool str_from_format(string *str_uninit,
 
   va_start(args, format);
 
-  if (unlikely(!__str_format_probe(max_len, format, args, &want)) ||
-      unlikely(!__str_add_size(want, 1, &cap_hint)) ||
-      unlikely(!__str_init(str_uninit, allocator, cap_hint))) {
+  if (unlikely(!__string_format_probe(max_len, format, args, &want)) ||
+      unlikely(!__string_add_size(want, 1, &cap_hint)) ||
+      unlikely(!__string_init(string_uninit, allocator, cap_hint))) {
     va_end(args);
     return (false);
   }
 
   if (want > 0) {
-    if (unlikely(!__str_reserve(str_uninit, want))) {
+    if (unlikely(!__string_reserve(string_uninit, want))) {
       va_end(args);
-      str_deinit(str_uninit);
+      string_deinit(string_uninit);
       return (false);
     }
-    (void)__str_vsnprintf((char *)__str_ptr(str_uninit), want + 1, format, args,
-                          &written);
-    __vector_set_length_internal(&str_uninit->_vec, want + 1);
-    __str_ptr(str_uninit)[want] = '\0';
+    (void)__string_vsnprintf((char *)__string_ptr(string_uninit), want + 1,
+                             format, args, &written);
+    __vector_set_length_internal(&string_uninit->_vec, want + 1);
+    __string_ptr(string_uninit)[want] = '\0';
   }
   va_end(args);
 
@@ -480,11 +508,11 @@ __no_discard bool str_from_format(string *str_uninit,
 
 /* Releases the internal buffer and zeroes the string descriptor.
  * After this call the string is uninitialised and may only be reused
- * by passing it to `str_init` again.
+ * by passing it to `string_init` again.
  *
  * Preconditions: `this` is a valid initialised string.
  */
-void str_deinit(string *this) {
+void string_deinit(string *this) {
   __bug_if_fail__(this != NULL);
 
   vector_deinit(&this->_vec);
@@ -495,10 +523,10 @@ void str_deinit(string *this) {
  *
  * Preconditions: `this` is a valid initialised string.
  */
-__pure1 size_t str_length(const string *this) {
+__pure1 size_t string_length(const string *this) {
   __bug_if_fail__(this != NULL);
 
-  return (__str_len(this));
+  return (__string_len(this));
 }
 
 /* Returns true when the string contains zero bytes. This is a
@@ -508,10 +536,10 @@ __pure1 size_t str_length(const string *this) {
  *
  * Preconditions: `this` is a valid initialised string.
  */
-__pure1 bool str_is_empty(const string *this) {
+__pure1 bool string_is_empty(const string *this) {
   __bug_if_fail__(this != NULL);
 
-  return (__str_len(this) == 0);
+  return (__string_len(this) == 0);
 }
 
 /* Sets the visible length to zero. Capacity is preserved and the
@@ -519,11 +547,11 @@ __pure1 bool str_is_empty(const string *this) {
  *
  * Preconditions: `this` is a valid initialised string.
  */
-void str_clear(string *this) {
+void string_clear(string *this) {
   __bug_if_fail__(this != NULL);
 
   __vector_set_length_internal(&this->_vec, 1);
-  __str_ptr(this)[0] = '\0';
+  __string_ptr(this)[0] = '\0';
 }
 
 /* Returns a pointer to the byte at `position`. Negative indices are
@@ -537,13 +565,14 @@ void str_clear(string *this) {
  * `position` is intentional: negative indices are part of the API
  * contract and a signed type is the only way to express them.
  */
-__pure1 unsigned char *str_index_to_ptr(const string *this, ssize_t position) {
+__pure1 unsigned char *string_index_to_ptr(const string *this,
+                                           ssize_t position) {
   __bug_if_fail__(this != NULL);
 
   ssize_t signed_len;
   ssize_t clamped_position;
 
-  signed_len = (ssize_t)__str_len(this);
+  signed_len = (ssize_t)__string_len(this);
   clamped_position = position;
 
   if (clamped_position < 0) {
@@ -555,7 +584,7 @@ __pure1 unsigned char *str_index_to_ptr(const string *this, ssize_t position) {
     return (NULL);
   }
 
-  return (__str_ptr(this) + (size_t)clamped_position);
+  return (__string_ptr(this) + (size_t)clamped_position);
 }
 
 /* Appends one byte to the end of the string.
@@ -563,14 +592,14 @@ __pure1 unsigned char *str_index_to_ptr(const string *this, ssize_t position) {
  * Preconditions: `this` is a valid initialised string.
  * Returns: true on success. On failure the string is unchanged.
  */
-__no_discard bool str_push_char(string *this, unsigned char byte) {
+__no_discard bool string_push_char(string *this, unsigned char byte) {
   __bug_if_fail__(this != NULL);
 
-  if (unlikely(!__str_reserve(this, 1))) {
+  if (unlikely(!__string_reserve(this, 1))) {
     return (false);
   }
 
-  __str_insert_bytes_unchecked(this, __str_len(this), &byte, 1);
+  __string_insert_bytes_unchecked(this, __string_len(this), &byte, 1);
   return (true);
 }
 
@@ -582,8 +611,8 @@ __no_discard bool str_push_char(string *this, unsigned char byte) {
  * `cstr` is readable for at least `max_len` bytes or `cstr` is NULL.
  * Returns: true on success. On failure the string is unchanged.
  */
-__no_discard bool str_push_cstr(string *this, size_t max_len,
-                                const unsigned char *cstr) {
+__no_discard bool string_push_cstr(string *this, size_t max_len,
+                                   const unsigned char *cstr) {
   __bug_if_fail__(this != NULL);
 
   size_t n;
@@ -592,16 +621,16 @@ __no_discard bool str_push_cstr(string *this, size_t max_len,
     return (true);
   }
 
-  n = __str_strnlen(cstr, max_len);
+  n = __string_strnlen(cstr, max_len);
   if (n == 0) {
     return (true);
   }
 
-  if (unlikely(!__str_reserve(this, n))) {
+  if (unlikely(!__string_reserve(this, n))) {
     return (false);
   }
 
-  __str_insert_bytes_unchecked(this, __str_len(this), cstr, n);
+  __string_insert_bytes_unchecked(this, __string_len(this), cstr, n);
   return (true);
 }
 
@@ -611,22 +640,23 @@ __no_discard bool str_push_cstr(string *this, size_t max_len,
  * Preconditions: `this` and `other` are valid initialised strings.
  * Returns: true on success. On failure `this` is unchanged.
  */
-__no_discard bool str_append(string *this, const string *other) {
+__no_discard bool string_append(string *this, const string *other) {
   __bug_if_fail__(this != NULL);
   __bug_if_fail__(other != NULL);
 
   size_t n;
 
-  n = __str_len(other);
+  n = __string_len(other);
   if (n == 0) {
     return (true);
   }
 
-  if (unlikely(!__str_reserve(this, n))) {
+  if (unlikely(!__string_reserve(this, n))) {
     return (false);
   }
 
-  __str_insert_bytes_unchecked(this, __str_len(this), __str_ptr(other), n);
+  __string_insert_bytes_unchecked(this, __string_len(this), __string_ptr(other),
+                                  n);
   return (true);
 }
 
@@ -637,8 +667,8 @@ __no_discard bool str_append(string *this, const string *other) {
  * is a valid format string with arguments to match.
  * Returns: true on success. On failure `this` is unchanged.
  */
-__no_discard bool str_append_format(string *this, size_t max_len,
-                                    const char *format, ...) {
+__no_discard bool string_append_format(string *this, size_t max_len,
+                                       const char *format, ...) {
   __bug_if_fail__(this != NULL);
   __bug_if_fail__(format != NULL);
 
@@ -649,7 +679,7 @@ __no_discard bool str_append_format(string *this, size_t max_len,
 
   va_start(args, format);
 
-  if (unlikely(!__str_format_probe(max_len, format, args, &want))) {
+  if (unlikely(!__string_format_probe(max_len, format, args, &want))) {
     va_end(args);
     return (false);
   }
@@ -659,18 +689,18 @@ __no_discard bool str_append_format(string *this, size_t max_len,
     return (true);
   }
 
-  if (unlikely(!__str_reserve(this, want))) {
+  if (unlikely(!__string_reserve(this, want))) {
     va_end(args);
     return (false);
   }
 
-  at = __str_len(this);
-  (void)__str_vsnprintf((char *)__str_ptr(this) + at, want + 1, format, args,
-                        &written);
+  at = __string_len(this);
+  (void)__string_vsnprintf((char *)__string_ptr(this) + at, want + 1, format,
+                           args, &written);
   va_end(args);
 
   __vector_set_length_internal(&this->_vec, at + want + 1);
-  __str_ptr(this)[at + want] = '\0';
+  __string_ptr(this)[at + want] = '\0';
   return (true);
 }
 
@@ -679,19 +709,19 @@ __no_discard bool str_append_format(string *this, size_t max_len,
  *
  * Preconditions: `this` is a valid initialised string.
  */
-int str_pop_char(string *this) {
+int string_pop_char(string *this) {
   __bug_if_fail__(this != NULL);
 
   size_t len;
   int byte;
 
-  len = __str_len(this);
+  len = __string_len(this);
   if (len == 0) {
     return (-1);
   }
 
-  byte = (int)__str_ptr(this)[len - 1];
-  __str_remove_bytes_unchecked(this, len - 1, 1);
+  byte = (int)__string_ptr(this)[len - 1];
+  __string_remove_bytes_unchecked(this, len - 1, 1);
 
   return (byte);
 }
@@ -701,14 +731,14 @@ int str_pop_char(string *this) {
  * Preconditions: `this` is a valid initialised string.
  * Returns: true on success. On failure the string is unchanged.
  */
-__no_discard bool str_pushf_char(string *this, unsigned char byte) {
+__no_discard bool string_pushf_char(string *this, unsigned char byte) {
   __bug_if_fail__(this != NULL);
 
-  if (unlikely(!__str_reserve(this, 1))) {
+  if (unlikely(!__string_reserve(this, 1))) {
     return (false);
   }
 
-  __str_insert_bytes_unchecked(this, 0, &byte, 1);
+  __string_insert_bytes_unchecked(this, 0, &byte, 1);
   return (true);
 }
 
@@ -717,19 +747,19 @@ __no_discard bool str_pushf_char(string *this, unsigned char byte) {
  *
  * Preconditions: `this` is a valid initialised string.
  */
-int str_popf_char(string *this) {
+int string_popf_char(string *this) {
   __bug_if_fail__(this != NULL);
 
   size_t len;
   int byte;
 
-  len = __str_len(this);
+  len = __string_len(this);
   if (len == 0) {
     return (-1);
   }
 
-  byte = (int)__str_ptr(this)[0];
-  __str_remove_bytes_unchecked(this, 0, 1);
+  byte = (int)__string_ptr(this)[0];
+  __string_remove_bytes_unchecked(this, 0, 1);
   return (byte);
 }
 
@@ -739,19 +769,19 @@ int str_popf_char(string *this) {
  * Preconditions: `this` is a valid initialised string.
  * Returns: true on success. On failure the string is unchanged.
  */
-__no_discard bool str_insert_char(string *this, size_t position,
-                                  unsigned char byte) {
+__no_discard bool string_insert_char(string *this, size_t position,
+                                     unsigned char byte) {
   __bug_if_fail__(this != NULL);
 
-  if (unlikely(position > __str_len(this))) {
+  if (unlikely(position > __string_len(this))) {
     return (false);
   }
 
-  if (unlikely(!__str_reserve(this, 1))) {
+  if (unlikely(!__string_reserve(this, 1))) {
     return (false);
   }
 
-  __str_insert_bytes_unchecked(this, position, &byte, 1);
+  __string_insert_bytes_unchecked(this, position, &byte, 1);
   return (true);
 }
 
@@ -763,13 +793,14 @@ __no_discard bool str_insert_char(string *this, size_t position,
  * `cstr` is readable for at least `max_len` bytes or `cstr` is NULL.
  * Returns: true on success. On failure the string is unchanged.
  */
-__no_discard bool str_insert_cstr(string *this, size_t position, size_t max_len,
-                                  const unsigned char *cstr) {
+__no_discard bool string_insert_cstr(string *this, size_t position,
+                                     size_t max_len,
+                                     const unsigned char *cstr) {
   __bug_if_fail__(this != NULL);
 
   size_t n;
 
-  if (unlikely(position > __str_len(this))) {
+  if (unlikely(position > __string_len(this))) {
     return (false);
   }
 
@@ -777,16 +808,16 @@ __no_discard bool str_insert_cstr(string *this, size_t position, size_t max_len,
     return (true);
   }
 
-  n = __str_strnlen(cstr, max_len);
+  n = __string_strnlen(cstr, max_len);
   if (n == 0) {
     return (true);
   }
 
-  if (unlikely(!__str_reserve(this, n))) {
+  if (unlikely(!__string_reserve(this, n))) {
     return (false);
   }
 
-  __str_insert_bytes_unchecked(this, position, cstr, n);
+  __string_insert_bytes_unchecked(this, position, cstr, n);
   return (true);
 }
 
@@ -798,40 +829,40 @@ __no_discard bool str_insert_cstr(string *this, size_t position, size_t max_len,
  * Preconditions: `this` and `other` are valid initialised strings.
  * Returns: true on success. On failure `this` is unchanged.
  */
-__no_discard bool str_insert_other(string *this, size_t position,
-                                   const string *other) {
+__no_discard bool string_insert_other(string *this, size_t position,
+                                      const string *other) {
   __bug_if_fail__(this != NULL);
   __bug_if_fail__(other != NULL);
 
   string tmp;
   size_t n;
 
-  if (unlikely(position > __str_len(this))) {
+  if (unlikely(position > __string_len(this))) {
     return (false);
   }
 
   if (unlikely(this == other)) {
-    if (!str_clone(other, &tmp)) {
+    if (!string_clone(other, &tmp)) {
       goto prison;
     }
-    if (!str_insert_other(this, position, &tmp)) {
-      str_deinit(&tmp);
+    if (!string_insert_other(this, position, &tmp)) {
+      string_deinit(&tmp);
       goto prison;
     }
-    str_deinit(&tmp);
+    string_deinit(&tmp);
     goto beach;
   }
 
-  n = __str_len(other);
+  n = __string_len(other);
   if (n == 0) {
     goto beach;
   }
 
-  if (unlikely(!__str_reserve(this, n))) {
+  if (unlikely(!__string_reserve(this, n))) {
     goto prison;
   }
 
-  __str_insert_bytes_unchecked(this, position, __str_ptr(other), n);
+  __string_insert_bytes_unchecked(this, position, __string_ptr(other), n);
   goto beach;
 
 prison:
@@ -848,8 +879,9 @@ beach:
  * is a valid format string with arguments to match.
  * Returns: true on success. On failure `this` is unchanged.
  */
-__no_discard bool str_insert_format(string *this, size_t position,
-                                    size_t max_len, const char *format, ...) {
+__no_discard bool string_insert_format(string *this, size_t position,
+                                       size_t max_len, const char *format,
+                                       ...) {
   __bug_if_fail__(this != NULL);
   __bug_if_fail__(format != NULL);
 
@@ -859,13 +891,13 @@ __no_discard bool str_insert_format(string *this, size_t position,
   size_t written;
   unsigned char *tmp;
 
-  if (unlikely(position > __str_len(this))) {
+  if (unlikely(position > __string_len(this))) {
     return (false);
   }
 
   va_start(args, format);
 
-  if (unlikely(!__str_format_probe(max_len, format, args, &want))) {
+  if (unlikely(!__string_format_probe(max_len, format, args, &want))) {
     va_end(args);
     return (false);
   }
@@ -875,25 +907,25 @@ __no_discard bool str_insert_format(string *this, size_t position,
     return (true);
   }
 
-  if (unlikely(!__str_add_size(want, 1, &tmp_size))) {
+  if (unlikely(!__string_add_size(want, 1, &tmp_size))) {
     va_end(args);
     return (false);
   }
 
-  if (unlikely(!__str_alloc(this, tmp_size, &tmp))) {
+  if (unlikely(!__string_alloc(this, tmp_size, &tmp))) {
     va_end(args);
     return (false);
   }
 
-  (void)__str_vsnprintf((char *)tmp, tmp_size, format, args, &written);
+  (void)__string_vsnprintf((char *)tmp, tmp_size, format, args, &written);
   va_end(args);
 
-  if (unlikely(!__str_reserve(this, want))) {
+  if (unlikely(!__string_reserve(this, want))) {
     this->_vec._allocator.release(tmp);
     goto prison;
   }
 
-  __str_insert_bytes_unchecked(this, position, tmp, want);
+  __string_insert_bytes_unchecked(this, position, tmp, want);
   this->_vec._allocator.release(tmp);
   goto beach;
 
@@ -908,14 +940,14 @@ beach:
  *
  * Preconditions: `this` is a valid initialised string.
  */
-void str_remove(string *this, size_t position) {
+void string_remove(string *this, size_t position) {
   __bug_if_fail__(this != NULL);
 
-  if (position >= __str_len(this)) {
+  if (position >= __string_len(this)) {
     return;
   }
 
-  __str_remove_bytes_unchecked(this, position, 1);
+  __string_remove_bytes_unchecked(this, position, 1);
 }
 
 /* Removes the half-open range `[start, end)`. `end > length` is
@@ -923,10 +955,10 @@ void str_remove(string *this, size_t position) {
  *
  * Preconditions: `this` is a valid initialised string.
  */
-void str_remove_range(string *this, size_t start, size_t end) {
+void string_remove_range(string *this, size_t start, size_t end) {
   __bug_if_fail__(this != NULL);
 
-  const size_t len = __str_len(this);
+  const size_t len = __string_len(this);
 
   if (start >= len || end <= start) {
     return;
@@ -936,7 +968,7 @@ void str_remove_range(string *this, size_t start, size_t end) {
     end = len;
   }
 
-  __str_remove_bytes_unchecked(this, start, end - start);
+  __string_remove_bytes_unchecked(this, start, end - start);
 }
 
 /* Shrinks the visible length to `len`. `len >= length` is a no-op.
@@ -944,16 +976,16 @@ void str_remove_range(string *this, size_t start, size_t end) {
  *
  * Preconditions: `this` is a valid initialised string.
  */
-void str_truncate(string *this, size_t len) {
+void string_truncate(string *this, size_t len) {
   __bug_if_fail__(this != NULL);
 
-  const size_t cur = __str_len(this);
+  const size_t cur = __string_len(this);
 
   if (len >= cur) {
     return;
   }
 
-  __str_remove_bytes_unchecked(this, len, cur - len);
+  __string_remove_bytes_unchecked(this, len, cur - len);
 }
 
 /* Reallocates to a tight buffer (`length + 1` bytes) if more than
@@ -963,7 +995,7 @@ void str_truncate(string *this, size_t len) {
  * Returns: true on success or when no shrink was necessary. On
  * allocation failure the string is unchanged and false is returned.
  */
-__no_discard bool str_shrink_to_fit(string *this) {
+__no_discard bool string_shrink_to_fit(string *this) {
   __bug_if_fail__(this != NULL);
 
   size_t target;
@@ -973,7 +1005,7 @@ __no_discard bool str_shrink_to_fit(string *this) {
 
   vlen = vector_length(&this->_vec);
 
-  if (unlikely(!__str_add_size(__str_len(this), 1, &target))) {
+  if (unlikely(!__string_add_size(__string_len(this), 1, &target))) {
     return (false);
   }
 
@@ -982,13 +1014,13 @@ __no_discard bool str_shrink_to_fit(string *this) {
     return (true);
   }
 
-  if (unlikely(!__str_alloc(this, target, &new_buf))) {
+  if (unlikely(!__string_alloc(this, target, &new_buf))) {
     return (false);
   }
 
-  __memcpy(new_buf, __str_ptr(this), vlen);
+  __memcpy(new_buf, __string_ptr(this), vlen);
 
-  this->_vec._allocator.release(__str_ptr(this));
+  this->_vec._allocator.release(__string_ptr(this));
   __vector_set_ptr_internal(&this->_vec, new_buf);
   __vector_set_capacity_internal(&this->_vec, target);
   return (true);
@@ -999,19 +1031,19 @@ __no_discard bool str_shrink_to_fit(string *this) {
  * NUL-terminated (the module's invariant places that NUL inside the
  * vector itself) and must later be released through the same
  * allocator the string was constructed with. Call
- * `str_shrink_to_fit` beforehand to obtain a tight allocation.
+ * `string_shrink_to_fit` beforehand to obtain a tight allocation.
  *
  * Preconditions: `this` is a valid initialised string and `out_buf`
  * is non-NULL.
  *
  * Postconditions: `*out_buf` points to the buffer that previously
  * backed `this`; `this` has been zeroed and may only be reused by
- * passing it to `str_init` again. This function cannot fail.
+ * passing it to `string_init` again. This function cannot fail.
  */
-void str_leak_cstr(string *this, unsigned char **out_buf) {
+void string_leak_cstr(string *this, unsigned char **out_buf) {
   __bug_if_fail__(this != NULL);
   __bug_if_fail__(out_buf != NULL);
 
-  *out_buf = __str_ptr(this);
+  *out_buf = __string_ptr(this);
   __memset(this, 0, sizeof(*this));
 }
